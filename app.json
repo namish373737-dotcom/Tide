@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "TIDE - Wellness Tracker",
+    "slug": "tide-wellness",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "scheme": "tide-wellness",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tide.wellness"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#06b6d4"
+      },
+      "package": "com.tide.wellness"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-file-system",
+      "expo-sharing"
+    ],
+    "permissions": [
+      "ACCESS_NETWORK_STATE"
+    ]
+  }
+}
