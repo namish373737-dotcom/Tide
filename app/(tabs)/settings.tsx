@@ -1,0 +1,203 @@
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, StatusBar } from 'react-native';
+import { useState, useEffect } from 'react';
+import { router } from 'expo-router';
+import { getDatabase } from '@/lib/database/client';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import * as LocalAuthentication from 'expo-local-authentication';
+import { Shield, FileText, Trash2, Moon, Bell, Heart, ChevronRight, Fingerprint, Cloud, Lock } from 'lucide-react-native';
+import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
+
+export default function SettingsScreen() {
+  const [settings, setSettings] = useState<any>(null);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [icloudAvailable, setIcloudAvailable] = useState(false);
+
+  useEffect(() => {
+    async function fetch() {
+      const db = await getDatabase();
+      const row = await db.getFirstAsync('SELECT * FROM user_settings LIMIT 1');
+      setSettings(row);
+      const bio = await LocalAuthentication.hasHardwareAsync();
+      setBiometricAvailable(bio);
+      setIcloudAvailable(true);
+    }
+    fetch();
+  }, []);
+
+  const handleExport = async () => {
+    const db = await getDatabase();
+    const entries = await db.getAllAsync('SELECT * FROM daily_entries ORDER BY entry_date DESC');
+    const json = JSON.stringify(entries, null, 2);
+    const fileUri = (FileSystem as any).documentDirectory + 'tide_export.json';
+    await FileSystem.writeAsStringAsync(fileUri, json);
+    await Sharing.shareAsync(fileUri);
+  };
+
+  const handleDeleteAll = () => {
+    Alert.alert('Delete All Data', 'This will permanently delete all your health data. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          const db = await getDatabase();
+          await db.runAsync('DELETE FROM daily_entries');
+          await db.runAsync('DELETE FROM symptom_logs');
+          await db.runAsync('DELETE FROM trigger_logs');
+          await db.runAsync('DELETE FROM medication_logs');
+          await db.runAsync('DELETE FROM cycle_logs');
+          Alert.alert('Data Deleted', 'All your data has been permanently removed.');
+        },
+      },
+    ]);
+  };
+
+  const handleResetOnboarding = async () => {
+    const db = await getDatabase();
+    await db.runAsync('UPDATE user_settings SET onboarding_complete = 0 WHERE id = 1');
+    await db.runAsync('UPDATE symptoms SET is_enabled = 0');
+    await db.runAsync('UPDATE triggers SET is_enabled = 0');
+    router.replace('/onboarding/welcome');
+  };
+
+  const toggleBiometric = async () => {
+    const db = await getDatabase();
+    const newVal = settings?.biometric_lock_enabled ? 0 : 1;
+    await db.runAsync('UPDATE user_settings SET biometric_lock_enabled = ?', [newVal]);
+    setSettings({ ...settings, biometric_lock_enabled: newVal });
+  };
+
+  const toggleIcloud = async () => {
+    const db = await getDatabase();
+    const newVal = settings?.icloud_backup_enabled ? 0 : 1;
+    await db.runAsync('UPDATE user_settings SET icloud_backup_enabled = ?', [newVal]);
+    setSettings({ ...settings, icloud_backup_enabled: newVal });
+  };
+
+  const toggleReminder = async (enabled: boolean) => {
+    const db = await getDatabase();
+    await db.runAsync('UPDATE user_settings SET reminder_enabled = ?', [enabled ? 1 : 0]);
+    setSettings({ ...settings, reminder_enabled: enabled ? 1 : 0 });
+  };
+
+  const updateReminderTime = async (time: string) => {
+    const db = await getDatabase();
+    await db.runAsync('UPDATE user_settings SET daily_reminder_time = ?', [time]);
+    setSettings({ ...settings, daily_reminder_time: time });
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.title}>Settings</Text>
+
+        {/* Notifications Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Bell size={20} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>Notifications</Text>
+          </View>
+          <SettingRow
+            icon={<Bell size={20} color={COLORS.primary} />}
+            title="Daily Reminder"
+            subtitle={settings?.reminder_enabled ? `Reminds you at ${settings?.daily_reminder_time || '21:00'}` : 'Get a daily reminder to log your symptoms'}
+            onPress={() => toggleReminder(!settings?.reminder_enabled)}
+            toggle
+            value={!!settings?.reminder_enabled}
+          />
+        </View>
+
+        {/* Privacy Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Shield size={20} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>Privacy</Text>
+          </View>
+          <Text style={styles.sectionDescription}>Your data is stored only on this device. We do not collect, share, or sell your health information.</Text>
+          <SettingRow icon={<FileText size={20} color={COLORS.primary} />} title="Export Data" subtitle="Download all your data as a JSON file" onPress={handleExport} />
+          {biometricAvailable && (
+            <SettingRow icon={<Fingerprint size={20} color={COLORS.primary} />} title="Biometric Lock" subtitle={settings?.biometric_lock_enabled ? 'Face ID / Touch ID is enabled' : 'Require Face ID or Touch ID to open the app'}
+              onPress={toggleBiometric} toggle value={!!settings?.biometric_lock_enabled} />
+          )}
+          {icloudAvailable && (
+            <SettingRow icon={<Cloud size={20} color={COLORS.primary} />} title="iCloud Backup" subtitle={settings?.icloud_backup_enabled ? 'Encrypted backup to iCloud is enabled' : 'Backup your data to your private iCloud container'}
+              onPress={toggleIcloud} toggle value={!!settings?.icloud_backup_enabled} />
+          )}
+        </View>
+
+        {/* Data Management */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Trash2 size={20} color={COLORS.danger} />
+            <Text style={styles.sectionTitle}>Data Management</Text>
+          </View>
+          <SettingRow icon={<Trash2 size={20} color={COLORS.danger} />} title="Delete All Data" subtitle="Permanently remove all health data from this device" onPress={handleDeleteAll} danger />
+          <SettingRow icon={<Lock size={20} color={COLORS.textSecondary} />} title="Reset Onboarding" subtitle="Start over with condition selection" onPress={handleResetOnboarding} />
+        </View>
+
+        {/* About */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Heart size={20} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>About</Text>
+          </View>
+          <Text style={styles.sectionDescription}>Tide is built for people living with chronic conditions. We believe your health data belongs to you and no one else.</Text>
+          <Text style={styles.versionText}>Version 1.0.0</Text>
+        </View>
+
+        {/* Medical Disclaimer */}
+        <View style={styles.disclaimer}>
+          <Text style={styles.disclaimerText}>
+            <Text style={styles.disclaimerBold}>Medical Disclaimer:</Text> Tide is for informational purposes only and does not provide medical advice. Always consult a qualified healthcare professional.
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function SettingRow({ icon, title, subtitle, onPress, danger = false, toggle = false, value = false }: {
+  icon: React.ReactNode; title: string; subtitle: string; onPress: () => void; danger?: boolean; toggle?: boolean; value?: boolean;
+}) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.settingRow, pressed && styles.settingRowPressed]}>
+      <View style={styles.settingIcon}>{icon}</View>
+      <View style={styles.settingContent}>
+        <Text style={[styles.settingTitle, danger && styles.settingTitleDanger]}>{title}</Text>
+        <Text style={styles.settingSubtitle}>{subtitle}</Text>
+      </View>
+      {toggle ? (
+        <View style={[styles.toggle, value && styles.toggleActive]}>
+          <View style={[styles.toggleDot, value && styles.toggleDotActive]} />
+        </View>
+      ) : (
+        <ChevronRight size={20} color={COLORS.textTertiary} />
+      )}
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.background },
+  scrollContent: { paddingHorizontal: LAYOUT.screenPadding, paddingTop: LAYOUT.safeTop, paddingBottom: LAYOUT.safeBottom + SPACING.xl },
+  title: { ...TYPOGRAPHY.h2, color: COLORS.text, marginBottom: SPACING.xl },
+  section: { backgroundColor: COLORS.surface, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.xl, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm },
+  sectionTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, marginLeft: SPACING.sm },
+  sectionDescription: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, lineHeight: 22, marginBottom: SPACING.md },
+  settingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.divider },
+  settingRowPressed: { opacity: 0.7 },
+  settingIcon: { marginRight: SPACING.sm },
+  settingContent: { flex: 1 },
+  settingTitle: { ...TYPOGRAPHY.label, color: COLORS.text },
+  settingTitleDanger: { color: COLORS.danger },
+  settingSubtitle: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, marginTop: 2 },
+  toggle: { width: 48, height: 28, borderRadius: RADIUS.full, backgroundColor: COLORS.border, justifyContent: 'center', paddingHorizontal: 2 },
+  toggleActive: { backgroundColor: COLORS.primary },
+  toggleDot: { width: 24, height: 24, borderRadius: RADIUS.full, backgroundColor: COLORS.white, ...SHADOWS.sm },
+  toggleDotActive: { transform: [{ translateX: 20 }] },
+  versionText: { ...TYPOGRAPHY.caption, color: COLORS.textTertiary, marginTop: SPACING.sm },
+  disclaimer: { backgroundColor: COLORS.warningLight, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.xl, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.2)' },
+  disclaimerText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, lineHeight: 22 },
+  disclaimerBold: { ...TYPOGRAPHY.label, color: COLORS.text },
+});
