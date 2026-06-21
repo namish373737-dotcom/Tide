@@ -16,7 +16,7 @@ export default function SettingsScreen() {
   useEffect(() => {
     async function fetch() {
       const db = await getDatabase();
-      const row = await db.getFirstAsync('SELECT * FROM user_settings LIMIT 1');
+      const row = await db.getFirstAsync('SELECT * FROM user_settings ORDER BY id DESC LIMIT 1');
       setSettings(row);
       const bio = await LocalAuthentication.hasHardwareAsync();
       setBiometricAvailable(bio);
@@ -45,7 +45,12 @@ export default function SettingsScreen() {
           await db.runAsync('DELETE FROM trigger_logs');
           await db.runAsync('DELETE FROM medication_logs');
           await db.runAsync('DELETE FROM cycle_logs');
+          await db.runAsync('DELETE FROM insights_cache');
+          await db.runAsync('UPDATE user_settings SET onboarding_complete = 0, selected_conditions = "[]"');
+          await db.runAsync('UPDATE symptoms SET is_enabled = 0');
+          await db.runAsync('UPDATE triggers SET is_enabled = 0');
           Alert.alert('Data Deleted', 'All your data has been permanently removed.');
+          router.replace('/onboarding/welcome');
         },
       },
     ]);
@@ -53,7 +58,10 @@ export default function SettingsScreen() {
 
   const handleResetOnboarding = async () => {
     const db = await getDatabase();
-    await db.runAsync('UPDATE user_settings SET onboarding_complete = 0 WHERE id = 1');
+    const latest = await db.getFirstAsync<{ id: number }>('SELECT id FROM user_settings ORDER BY id DESC LIMIT 1');
+    if (latest) {
+      await db.runAsync('UPDATE user_settings SET onboarding_complete = 0 WHERE id = ?', [latest.id]);
+    }
     await db.runAsync('UPDATE symptoms SET is_enabled = 0');
     await db.runAsync('UPDATE triggers SET is_enabled = 0');
     router.replace('/onboarding/welcome');

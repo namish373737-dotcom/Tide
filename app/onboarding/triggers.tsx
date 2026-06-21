@@ -27,7 +27,10 @@ export default function TriggersScreen() {
   const handleContinue = async () => {
     const db = await getDatabase();
     for (const id of selected) { await db.runAsync('UPDATE triggers SET is_enabled = 1 WHERE id = ?', [id]); }
-    await db.runAsync('UPDATE user_settings SET onboarding_complete = 1 WHERE id = 1');
+    const latest = await db.getFirstAsync<{ id: number }>('SELECT id FROM user_settings ORDER BY id DESC LIMIT 1');
+    if (latest) {
+      await db.runAsync('UPDATE user_settings SET onboarding_complete = 1 WHERE id = ?', [latest.id]);
+    }
     router.replace('/(tabs)');
   };
 

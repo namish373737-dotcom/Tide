@@ -178,8 +178,13 @@ function MedicationSection({ entryId, dateInt }: { entryId?: number; dateInt: nu
     const newValue = !medLogs[medId];
     let eid = entryId;
     if (!eid) {
-      const result = await db.runAsync('INSERT INTO daily_entries (entry_date) VALUES (?)', [dateInt]);
-      eid = result.lastInsertRowId;
+      const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM daily_entries WHERE entry_date = ?', [dateInt]);
+      if (existing) {
+        eid = existing.id;
+      } else {
+        const result = await db.runAsync('INSERT INTO daily_entries (entry_date) VALUES (?)', [dateInt]);
+        eid = result.lastInsertRowId;
+      }
     }
     await db.runAsync('INSERT OR REPLACE INTO medication_logs (daily_entry_id, medication_id, taken) VALUES (?, ?, ?)', [eid, medId, newValue ? 1 : 0]);
     setMedLogs(prev => ({ ...prev, [medId]: newValue }));
@@ -229,8 +234,13 @@ function CycleSection({ entryId, dateInt }: { entryId?: number; dateInt: number 
     const newLevel = flowLevel === value ? null : value;
     let eid = entryId;
     if (!eid) {
-      const result = await db.runAsync('INSERT INTO daily_entries (entry_date) VALUES (?)', [dateInt]);
-      eid = result.lastInsertRowId;
+      const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM daily_entries WHERE entry_date = ?', [dateInt]);
+      if (existing) {
+        eid = existing.id;
+      } else {
+        const result = await db.runAsync('INSERT INTO daily_entries (entry_date) VALUES (?)', [dateInt]);
+        eid = result.lastInsertRowId;
+      }
     }
     if (newLevel) {
       await db.runAsync('INSERT OR REPLACE INTO cycle_logs (daily_entry_id, flow_level) VALUES (?, ?)', [eid, newLevel]);

@@ -9,7 +9,7 @@ export default function OnboardingRedirect() {
     async function check() {
       const db = await getDatabase();
       const settings = await db.getFirstAsync<{ onboarding_complete: number }>(
-        'SELECT onboarding_complete FROM user_settings LIMIT 1'
+        'SELECT onboarding_complete FROM user_settings ORDER BY id DESC LIMIT 1'
       );
       setOnboardingComplete(!!settings?.onboarding_complete);
     }

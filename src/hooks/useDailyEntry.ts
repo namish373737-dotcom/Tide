@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
+import * as SQLite from 'expo-sqlite';
 import { getDatabase } from '@/lib/database/client';
 import { DailyEntry, SymptomLog, TriggerLog, MedicationLog, CycleLog } from '@/types';
+
+async function getOrCreateEntryId(db: SQLite.SQLiteDatabase, date: number, existingEntryId?: number): Promise<number> {
+  if (existingEntryId) return existingEntryId;
+  const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM daily_entries WHERE entry_date = ?', [date]);
+  if (existing) return existing.id;
+  const result = await db.runAsync('INSERT INTO daily_entries (entry_date) VALUES (?)', [date]);
+  return result.lastInsertRowId;
+}
 
 export function useDailyEntry(date: number) {
   const [entry, setEntry] = useState<DailyEntry | null>(null);
@@ -15,7 +24,7 @@ export function useDailyEntry(date: number) {
     const db = await getDatabase();
     
     const entryRow = await db.getFirstAsync<DailyEntry>(
-      'SELECT * FROM daily_entries WHERE entry_date = ?',
+      'SELECT id, entry_date, notes, mood, energy, sleep_hours, steps, resting_heart_rate, created_at, updated_at FROM daily_entries WHERE entry_date = ?',
       [date]
     );
 
@@ -23,25 +32,25 @@ export function useDailyEntry(date: number) {
       setEntry(entryRow);
       
       const sLogs = await db.getAllAsync<SymptomLog>(
-        'SELECT * FROM symptom_logs WHERE daily_entry_id = ?',
+        'SELECT id, daily_entry_id as dailyEntryId, symptom_id as symptomId, severity, notes FROM symptom_logs WHERE daily_entry_id = ?',
         [entryRow.id]
       );
       setSymptomLogs(sLogs);
 
       const tLogs = await db.getAllAsync<TriggerLog>(
-        'SELECT * FROM trigger_logs WHERE daily_entry_id = ?',
+        'SELECT id, daily_entry_id as dailyEntryId, trigger_id as triggerId, value, notes FROM trigger_logs WHERE daily_entry_id = ?',
         [entryRow.id]
       );
       setTriggerLogs(tLogs);
 
       const mLogs = await db.getAllAsync<MedicationLog>(
-        'SELECT * FROM medication_logs WHERE daily_entry_id = ?',
+        'SELECT id, daily_entry_id as dailyEntryId, medication_id as medicationId, taken, taken_at as takenAt, dose_taken as doseTaken, notes FROM medication_logs WHERE daily_entry_id = ?',
         [entryRow.id]
       );
       setMedicationLogs(mLogs);
 
       const cLog = await db.getFirstAsync<CycleLog>(
-        'SELECT * FROM cycle_logs WHERE daily_entry_id = ?',
+        'SELECT id, daily_entry_id as dailyEntryId, flow_level as flowLevel, cycle_day as cycleDay, phase, ovulation_test as ovulationTest, cervical_mucus as cervicalMucus FROM cycle_logs WHERE daily_entry_id = ?',
         [entryRow.id]
       );
       setCycleLog(cLog || null);
@@ -79,11 +88,11 @@ export function useDailyEntry(date: number) {
       );
       entryId = entry.id;
     } else {
-      const result = await db.runAsync(
-        `INSERT INTO daily_entries (entry_date, notes, mood, energy, sleep_hours, steps, resting_heart_rate) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [date, data.notes || null, data.mood || null, data.energy || null, data.sleepHours || null, data.steps || null, data.restingHeartRate || null]
+      entryId = await getOrCreateEntryId(db, date);
+      await db.runAsync(
+        `UPDATE daily_entries SET notes = ?, mood = ?, energy = ?, sleep_hours = ?, steps = ?, resting_heart_rate = ?, updated_at = unixepoch() WHERE id = ?`,
+        [data.notes || null, data.mood || null, data.energy || null, data.sleepHours || null, data.steps || null, data.restingHeartRate || null, entryId]
       );
-      entryId = result.lastInsertRowId;
     }
     
     await fetchEntry();
@@ -92,15 +101,7 @@ export function useDailyEntry(date: number) {
 
   const saveSymptomLog = useCallback(async (symptomId: number, severity: number) => {
     const db = await getDatabase();
-    let entryId = entry?.id;
-    
-    if (!entryId) {
-      const result = await db.runAsync(
-        'INSERT INTO daily_entries (entry_date) VALUES (?)',
-        [date]
-      );
-      entryId = result.lastInsertRowId;
-    }
+    const entryId = await getOrCreateEntryId(db, date, entry?.id);
     
     await db.runAsync(
       `INSERT OR REPLACE INTO symptom_logs (daily_entry_id, symptom_id, severity) VALUES (?, ?, ?)`,
@@ -112,15 +113,7 @@ export function useDailyEntry(date: number) {
 
   const saveTriggerLog = useCallback(async (triggerId: number, value: string) => {
     const db = await getDatabase();
-    let entryId = entry?.id;
-    
-    if (!entryId) {
-      const result = await db.runAsync(
-        'INSERT INTO daily_entries (entry_date) VALUES (?)',
-        [date]
-      );
-      entryId = result.lastInsertRowId;
-    }
+    const entryId = await getOrCreateEntryId(db, date, entry?.id);
     
     await db.runAsync(
       `INSERT OR REPLACE INTO trigger_logs (daily_entry_id, trigger_id, value) VALUES (?, ?, ?)`,
