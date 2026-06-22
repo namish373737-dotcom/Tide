@@ -1,6 +1,14 @@
 const { getDefaultConfig } = require('expo/metro-config');
-const { withNativeWind } = require('nativewind/metro');
+const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-module.exports = withNativeWind(config, { input: './global.css' });
+// Add path aliases for @/ imports
+config.resolver.extraNodeModules = {
+  ...config.resolver.extraNodeModules,
+  '@': path.resolve(__dirname, 'src'),
+};
+
+config.watchFolders = [path.resolve(__dirname, 'src')];
+
+module.exports = config;

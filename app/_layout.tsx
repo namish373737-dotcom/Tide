@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar';
 import { getDatabase } from '@/lib/database/client';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { COLORS } from '@/lib/theme';
-import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -13,7 +12,11 @@ export default function RootLayout() {
 
   useEffect(() => {
     async function init() {
-      await getDatabase();
+      try {
+        await getDatabase();
+      } catch (e) {
+        console.error('Database init failed:', e);
+      }
       setDbReady(true);
       SplashScreen.hideAsync();
     }
@@ -32,13 +35,11 @@ export default function RootLayout() {
     <>
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-        <Stack.Screen name="onboarding/welcome" options={{ animation: 'fade' }} />
-        <Stack.Screen name="onboarding/conditions" options={{ animation: 'fade' }} />
-        <Stack.Screen name="onboarding/symptoms" options={{ animation: 'fade' }} />
-        <Stack.Screen name="onboarding/triggers" options={{ animation: 'fade' }} />
-        <Stack.Screen name="check-in/[date]" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
-        <Stack.Screen name="report/index" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+        <Stack.Screen name="check-in" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="report" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
     </>
   );
