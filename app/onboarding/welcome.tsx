@@ -1,44 +1,52 @@
-import { useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar } from 'react-native';
 import { router } from 'expo-router';
-import { Heart, Lock, Shield, Sparkles } from 'lucide-react-native';
+import { Heart, Lock, Shield, Sparkles, ChevronRight } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 
 export default function WelcomeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      
+      {/* Soft gradient background */}
+      <View style={styles.gradientTop} />
+      <View style={styles.gradientBottom} />
+      
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Logo */}
+        {/* Logo with glow effect */}
         <View style={styles.logoSection}>
-          <View style={styles.logoContainer}>
-            <Heart size={40} color={COLORS.white} strokeWidth={2.5} />
+          <View style={styles.logoOuter}>
+            <View style={styles.logoContainer}>
+              <Heart size={44} color={COLORS.white} strokeWidth={2} fill={COLORS.white} />
+            </View>
           </View>
-          <Text style={styles.title}>Welcome to Tide</Text>
+          <Text style={styles.tagline}>TIDE</Text>
+          <Text style={styles.title}>Your health journey,{'\n'}privately tracked</Text>
           <Text style={styles.subtitle}>
-            The chronic wellness tracker built for you — not your data.
+            Built for people living with endometriosis, PCOS, and chronic pain. 
+            Your data never leaves your phone.
           </Text>
         </View>
 
         {/* Feature Cards */}
         <View style={styles.featuresSection}>
           <FeatureCard
-            icon={<Lock size={22} color={COLORS.primary} strokeWidth={2} />}
-            title="Your data stays on your phone"
-            description="No accounts. No servers. No cloud. Your health information is yours alone."
+            icon={<Lock size={20} color={COLORS.primary} strokeWidth={2} />}
+            title="Completely Private"
+            description="No accounts. No cloud. No data sharing. Your health information stays on your device, always."
           />
           <FeatureCard
-            icon={<Sparkles size={22} color={COLORS.primary} strokeWidth={2} />}
-            title="Built for your condition"
-            description="Endometriosis, PCOS, PMDD, and more — not a generic health app."
+            icon={<Shield size={20} color={COLORS.primary} strokeWidth={2} />}
+            title="Built for Your Condition"
+            description="Endometriosis, PCOS, PMDD, fibromyalgia — not a generic health app. We understand your symptoms."
           />
           <FeatureCard
-            icon={<Shield size={22} color={COLORS.primary} strokeWidth={2} />}
-            title="Find your patterns"
-            description="See what triggers your symptoms and what helps — all on your device."
+            icon={<Sparkles size={20} color={COLORS.primary} strokeWidth={2} />}
+            title="Find Your Patterns"
+            description="Discover what triggers your symptoms and what helps. Take control of your health with data that speaks for you."
           />
         </View>
       </ScrollView>
@@ -48,9 +56,9 @@ export default function WelcomeScreen() {
         <Pressable
           onPress={() => router.push('/onboarding/conditions')}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-          android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
         >
           <Text style={styles.buttonText}>Get Started</Text>
+          <ChevronRight size={20} color={COLORS.white} strokeWidth={2.5} />
         </Pressable>
         <Text style={styles.footerText}>
           By continuing, you agree to our Privacy Policy
@@ -77,31 +85,67 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  gradientTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+    backgroundColor: 'rgba(13, 115, 119, 0.04)',
+    borderBottomLeftRadius: 60,
+    borderBottomRightRadius: 60,
+  },
+  gradientBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 200,
+    backgroundColor: 'rgba(155, 89, 182, 0.03)',
+    borderTopLeftRadius: 60,
+    borderTopRightRadius: 60,
+  },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: LAYOUT.screenPadding,
-    paddingTop: LAYOUT.safeTop + SPACING.xl,
+    paddingTop: LAYOUT.safeTop + SPACING['2xl'],
     paddingBottom: SPACING.xl,
   },
   logoSection: {
     alignItems: 'center',
     marginBottom: SPACING['3xl'],
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS['3xl'],
+  logoOuter: {
+    width: 96,
+    height: 96,
+    borderRadius: 32,
+    backgroundColor: 'rgba(13, 115, 119, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
+  },
+  logoContainer: {
+    width: 72,
+    height: 72,
+    backgroundColor: COLORS.primary,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
     ...SHADOWS.md,
+  },
+  tagline: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 4,
+    color: COLORS.primary,
+    marginBottom: SPACING.sm,
   },
   title: {
     ...TYPOGRAPHY.h1,
     color: COLORS.text,
     textAlign: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
+    lineHeight: 42,
   },
   subtitle: {
     ...TYPOGRAPHY.body,
@@ -111,12 +155,12 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   featuresSection: {
-    gap: SPACING.base,
+    gap: SPACING.md,
   },
   featureCard: {
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl,
+    borderRadius: RADIUS['2xl'],
     padding: SPACING.lg,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -125,11 +169,11 @@ const styles = StyleSheet.create({
   featureIcon: {
     width: 44,
     height: 44,
-    backgroundColor: 'rgba(13, 115, 119, 0.1)',
+    backgroundColor: 'rgba(13, 115, 119, 0.08)',
     borderRadius: RADIUS.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.base,
+    marginRight: SPACING.md,
   },
   featureContent: {
     flex: 1,
@@ -148,7 +192,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: LAYOUT.screenPadding,
     paddingBottom: LAYOUT.safeBottom + SPACING.base,
     paddingTop: SPACING.base,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'rgba(250, 251, 252, 0.9)',
     borderTopWidth: 1,
     borderTopColor: COLORS.divider,
   },
@@ -158,10 +202,12 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
     ...SHADOWS.md,
   },
   buttonPressed: {
-    opacity: 0.85,
+    opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
   buttonText: {

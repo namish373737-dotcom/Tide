@@ -1,16 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar } from 'react-native';
 import { router } from 'expo-router';
 import { useSymptoms } from '@/hooks/useEntities';
 import { useDailyEntry } from '@/hooks/useDailyEntry';
 import { getDatabase } from '@/lib/database/client';
 import { format, subDays, startOfWeek, addDays, isSameDay } from 'date-fns';
-import { Flame, TrendingUp, ChevronRight, Plus, FileText, Lock } from 'lucide-react-native';
+import { Flame, TrendingUp, ChevronRight, Plus, FileText } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 
 function getTodayDateInt(): number {
   const today = new Date();
   return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+}
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
 }
 
 export default function DashboardScreen() {
@@ -54,38 +61,48 @@ export default function DashboardScreen() {
     fetchWeek();
   }, [entry]);
 
-  const topSymptoms = symptoms.slice(0, 3);
+  const greeting = getGreeting();
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
+        {/* Header with greeting */}
         <View style={styles.header}>
-          <Text style={styles.headerDay}>{format(new Date(), 'EEEE')}</Text>
-          <Text style={styles.headerDate}>{format(new Date(), 'MMMM d, yyyy')}</Text>
+          <Text style={styles.greeting}>{greeting}</Text>
+          <Text style={styles.date}>{format(new Date(), 'EEEE, MMMM d')}</Text>
         </View>
 
         {/* Streak Card */}
         <View style={styles.streakCard}>
-          <View style={styles.streakRow}>
-            <Flame size={24} color={COLORS.white} />
-            <Text style={styles.streakText}>{streak} day streak</Text>
+          <View style={styles.streakContent}>
+            <View style={styles.streakIcon}>
+              <Flame size={28} color={COLORS.white} />
+            </View>
+            <View>
+              <Text style={styles.streakText}>{streak} day streak</Text>
+              <Text style={styles.streakSubtext}>
+                {streak > 0 ? 'Keeping track of your health' : 'Start your streak today'}
+              </Text>
+            </View>
           </View>
-          <Text style={styles.streakSubtext}>{streak > 0 ? 'Great job keeping track of your health.' : 'Start tracking today to build your streak.'}</Text>
         </View>
 
         {/* Week Overview */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>This Week</Text>
+          <Text style={styles.cardTitle}>This Week</Text>
           <View style={styles.weekRow}>
             {weekData.map((day, i) => {
               const d = new Date(Math.floor(day.date / 10000), Math.floor((day.date % 10000) / 100) - 1, day.date % 100);
               const isToday = isSameDay(d, new Date());
               return (
                 <View key={i} style={styles.dayColumn}>
-                  <Text style={styles.dayLabel}>{format(d, 'EEE')[0]}</Text>
-                  <View style={[styles.dayDot, isToday && styles.dayDotToday, day.logged && (day.severity >= 7 ? styles.dayDotHigh : day.severity >= 4 ? styles.dayDotMed : styles.dayDotLow)]}>
+                  <Text style={[styles.dayLabel, isToday && styles.dayLabelActive]}>{format(d, 'EEE')[0]}</Text>
+                  <View style={[
+                    styles.dayDot,
+                    isToday && styles.dayDotToday,
+                    day.logged && (day.severity >= 7 ? styles.dayDotHigh : day.severity >= 4 ? styles.dayDotMed : styles.dayDotLow)
+                  ]}>
                     {day.logged && <Text style={styles.daySeverity}>{day.severity}</Text>}
                   </View>
                 </View>
@@ -95,12 +112,17 @@ export default function DashboardScreen() {
         </View>
 
         {/* Today's Check-in */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Check-in</Text>
-            {entry && <View style={styles.badge}><Text style={styles.badgeText}>Logged</Text></View>}
+        <View style={[styles.sectionCard, entry ? styles.loggedCard : styles.uncheckedCard]}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle}>Today's Check-in</Text>
+            {entry && (
+              <View style={styles.loggedBadge}>
+                <Text style={styles.loggedBadgeText}>Logged</Text>
+              </View>
+            )}
           </View>
-          {entry ? (
+          
+          {entry && symptomLogs.length > 0 ? (
             <View style={styles.symptomList}>
               {symptomLogs.slice(0, 3).map(log => {
                 const symptom = symptoms.find(s => s.id === log.symptomId);
@@ -115,11 +137,13 @@ export default function DashboardScreen() {
                   </View>
                 );
               })}
-              {symptomLogs.length === 0 && <Text style={styles.emptyText}>No symptoms logged today.</Text>}
             </View>
           ) : (
-            <Text style={styles.emptyText}>You haven't logged today yet. It takes less than a minute.</Text>
+            <Text style={styles.emptyText}>
+              {entry ? 'No symptoms logged yet.' : 'Take a moment to check in — it helps you and your doctor.'}
+            </Text>
           )}
+          
           <Pressable onPress={() => router.push('/check-in/' + today)} style={({ pressed }) => [styles.checkInButton, pressed && styles.checkInButtonPressed]}>
             <Plus size={18} color={COLORS.white} />
             <Text style={styles.checkInButtonText}>{entry ? 'Update Check-in' : 'Start Check-in'}</Text>
@@ -128,24 +152,28 @@ export default function DashboardScreen() {
 
         {/* Doctor Report */}
         <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <FileText size={20} color={COLORS.primary} />
-            <Text style={styles.sectionTitle}>Doctor Report</Text>
+          <View style={styles.cardHeaderRow}>
+            <FileText size={20} color={COLORS.primary} strokeWidth={2} />
+            <Text style={[styles.cardTitle, { marginLeft: SPACING.sm }]}>Doctor Report</Text>
           </View>
-          <Text style={styles.sectionDescription}>Generate a PDF report of your symptom history to bring to your next appointment.</Text>
-          <Pressable onPress={() => router.push('/report')} style={({ pressed }) => [styles.reportButton, pressed && styles.reportButtonPressed]}>
-            <FileText size={18} color={COLORS.white} />
-            <Text style={styles.reportButtonText}>Generate PDF</Text>
+          <Text style={styles.cardDescription}>
+            Generate a PDF of your symptom history to bring to your next appointment. Your data speaks for you.
+          </Text>
+          <Pressable onPress={() => router.push('/report')} style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]}>
+            <FileText size={18} color={COLORS.primary} />
+            <Text style={styles.secondaryButtonText}>Generate PDF</Text>
           </Pressable>
         </View>
 
         {/* Insight Preview */}
         <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <TrendingUp size={20} color={COLORS.primary} />
-            <Text style={styles.sectionTitle}>Insight</Text>
+          <View style={styles.cardHeaderRow}>
+            <TrendingUp size={20} color={COLORS.primary} strokeWidth={2} />
+            <Text style={[styles.cardTitle, { marginLeft: SPACING.sm }]}>Insights</Text>
           </View>
-          <Text style={styles.sectionDescription}>Log at least 7 days of data to start seeing personalized insights about your symptom patterns.</Text>
+          <Text style={styles.cardDescription}>
+            Log 7 days of symptoms to discover patterns — like which foods or activities affect your pain levels.
+          </Text>
           <Pressable onPress={() => router.push('/insights')} style={styles.linkRow}>
             <Text style={styles.linkText}>See all insights</Text>
             <ChevronRight size={16} color={COLORS.primary} />
@@ -160,29 +188,33 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { paddingHorizontal: LAYOUT.screenPadding, paddingTop: LAYOUT.safeTop, paddingBottom: LAYOUT.safeBottom + SPACING.xl },
   header: { marginBottom: SPACING.xl },
-  headerDay: { ...TYPOGRAPHY.h1, color: COLORS.text, marginBottom: SPACING.xs },
-  headerDate: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
-  streakCard: { backgroundColor: COLORS.primary, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.xl, ...SHADOWS.md },
-  streakRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm },
-  streakText: { ...TYPOGRAPHY.h4, color: COLORS.white, marginLeft: SPACING.sm },
-  streakSubtext: { ...TYPOGRAPHY.bodySmall, color: 'rgba(255,255,255,0.85)' },
-  sectionCard: { backgroundColor: COLORS.surface, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.xl, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md },
-  sectionTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, marginLeft: SPACING.sm },
-  sectionDescription: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, lineHeight: 22, marginBottom: SPACING.md },
-  badge: { backgroundColor: COLORS.successLight, paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: RADIUS.full },
-  badgeText: { ...TYPOGRAPHY.badge, color: COLORS.success },
+  greeting: { ...TYPOGRAPHY.h2, color: COLORS.text, marginBottom: 4 },
+  date: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
+  streakCard: { backgroundColor: COLORS.primary, borderRadius: RADIUS['2xl'], padding: SPACING.lg, marginBottom: SPACING.xl, ...SHADOWS.md },
+  streakContent: { flexDirection: 'row', alignItems: 'center' },
+  streakIcon: { width: 48, height: 48, borderRadius: RADIUS.lg, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
+  streakText: { ...TYPOGRAPHY.h3, color: COLORS.white },
+  streakSubtext: { ...TYPOGRAPHY.bodySmall, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  sectionCard: { backgroundColor: COLORS.surface, borderRadius: RADIUS['2xl'], padding: SPACING.lg, marginBottom: SPACING.xl, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm },
+  loggedCard: { borderColor: COLORS.success, borderWidth: 1.5 },
+  uncheckedCard: { },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md },
+  cardTitle: { ...TYPOGRAPHY.h3, color: COLORS.text },
+  loggedBadge: { backgroundColor: COLORS.successLight, paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: RADIUS.full, marginLeft: 'auto' },
+  loggedBadgeText: { ...TYPOGRAPHY.badge, color: COLORS.success },
+  cardDescription: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, lineHeight: 22, marginBottom: SPACING.md },
   weekRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: SPACING.sm },
-  dayColumn: { alignItems: 'center' },
-  dayLabel: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, marginBottom: SPACING.sm },
+  dayColumn: { alignItems: 'center', width: 40 },
+  dayLabel: { ...TYPOGRAPHY.caption, color: COLORS.textTertiary, marginBottom: SPACING.sm },
+  dayLabelActive: { color: COLORS.primary, fontWeight: '600' },
   dayDot: { width: 36, height: 36, borderRadius: RADIUS.full, backgroundColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
   dayDotToday: { borderWidth: 2, borderColor: COLORS.primary },
   dayDotHigh: { backgroundColor: COLORS.danger },
   dayDotMed: { backgroundColor: COLORS.warning },
   dayDotLow: { backgroundColor: COLORS.success },
-  daySeverity: { ...TYPOGRAPHY.badge, color: COLORS.white },
+  daySeverity: { ...TYPOGRAPHY.badge, color: COLORS.white, fontSize: 11 },
   symptomList: { marginBottom: SPACING.md },
-  symptomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SPACING.sm },
+  symptomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.divider },
   symptomName: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
   symptomValue: { flexDirection: 'row', alignItems: 'center' },
   severityDot: { width: 8, height: 8, borderRadius: RADIUS.full, marginRight: SPACING.sm },
@@ -190,13 +222,13 @@ const styles = StyleSheet.create({
   severityMed: { backgroundColor: COLORS.warning },
   severityLow: { backgroundColor: COLORS.success },
   severityText: { ...TYPOGRAPHY.label, color: COLORS.text },
-  emptyText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, marginBottom: SPACING.md },
+  emptyText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, lineHeight: 22, marginBottom: SPACING.md },
   checkInButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, ...SHADOWS.md },
   checkInButtonPressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
   checkInButtonText: { ...TYPOGRAPHY.button, color: COLORS.white, marginLeft: SPACING.sm },
-  reportButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, ...SHADOWS.md },
-  reportButtonPressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
-  reportButtonText: { ...TYPOGRAPHY.button, color: COLORS.white, marginLeft: SPACING.sm },
+  secondaryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(13, 115, 119, 0.08)', borderRadius: RADIUS.lg, paddingVertical: SPACING.md, borderWidth: 1.5, borderColor: COLORS.primary },
+  secondaryButtonPressed: { opacity: 0.8 },
+  secondaryButtonText: { ...TYPOGRAPHY.button, color: COLORS.primary, marginLeft: SPACING.sm },
   linkRow: { flexDirection: 'row', alignItems: 'center', marginTop: SPACING.sm },
   linkText: { ...TYPOGRAPHY.label, color: COLORS.primary },
 });
