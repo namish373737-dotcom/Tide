@@ -6,6 +6,9 @@ import { Check, ChevronRight } from 'lucide-react-native';
 import { Trigger } from '@/types';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 
+import { requestNotificationPermissions, scheduleDailyReminder } from '@/lib/notifications';
+import { hapticSuccess } from '@/lib/haptics';
+
 export default function TriggersScreen() {
   const [triggers, setTriggers] = useState<Trigger[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
@@ -33,6 +36,15 @@ export default function TriggersScreen() {
     if (latest) {
       await db.runAsync('UPDATE user_settings SET onboarding_complete = 1 WHERE id = ?', [latest.id]);
     }
+    
+    hapticSuccess();
+    
+    // Request notification permissions at end of onboarding
+    const granted = await requestNotificationPermissions();
+    if (granted) {
+      await scheduleDailyReminder('21:00');
+    }
+    
     router.replace('/(tabs)');
   };
 

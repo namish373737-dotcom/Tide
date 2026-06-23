@@ -8,6 +8,9 @@ import { format } from 'date-fns';
 import { ChevronLeft, Save } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 
+import { hapticSuccess, hapticSelection } from '@/lib/haptics';
+import { useInAppReview, incrementCheckInCount } from '@/lib/reviews';
+
 export default function CheckInScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const dateInt = parseInt(date || '0');
@@ -34,14 +37,18 @@ export default function CheckInScreen() {
     }
   }, [loading, symptomLogs, triggerLogs, entry]);
 
-  const handleSymptomChange = (id: number, value: number) => { setSymptomValues(prev => ({ ...prev, [id]: value })); };
-  const handleTriggerToggle = (id: number) => { setTriggerValues(prev => ({ ...prev, [id]: prev[id] === 'true' ? 'false' : 'true' })); };
+  const handleSymptomChange = (id: number, value: number) => { hapticSelection(); setSymptomValues(prev => ({ ...prev, [id]: value })); };
+  const handleTriggerToggle = (id: number) => { hapticSelection(); setTriggerValues(prev => ({ ...prev, [id]: prev[id] === 'true' ? 'false' : 'true' })); };
 
   const handleSave = async () => {
     setSaving(true);
     await saveEntry({ notes, mood, energy });
     for (const [sid, sev] of Object.entries(symptomValues)) { await saveSymptomLog(parseInt(sid), sev); }
     for (const [tid, val] of Object.entries(triggerValues)) { await saveTriggerLog(parseInt(tid), val); }
+    
+    hapticSuccess();
+    await incrementCheckInCount();
+    
     setSaving(false);
     router.back();
   };
@@ -69,7 +76,7 @@ export default function CheckInScreen() {
             <Text style={styles.ratingLabel}>Mood</Text>
             <View style={styles.ratingRow}>
               {[1, 2, 3, 4, 5].map(v => (
-                <Pressable key={v} onPress={() => setMood(v)} style={[styles.ratingButton, mood === v && styles.ratingButtonActive]}>
+                <Pressable key={v} onPress={() => { hapticSelection(); setMood(v); }} style={[styles.ratingButton, mood === v && styles.ratingButtonActive]}>
                   <Text style={[styles.ratingButtonText, mood === v && styles.ratingButtonTextActive]}>{v}</Text>
                 </Pressable>
               ))}
@@ -79,7 +86,7 @@ export default function CheckInScreen() {
             <Text style={styles.ratingLabel}>Energy</Text>
             <View style={styles.ratingRow}>
               {[1, 2, 3, 4, 5].map(v => (
-                <Pressable key={v} onPress={() => setEnergy(v)} style={[styles.ratingButton, energy === v && styles.ratingButtonActive]}>
+                <Pressable key={v} onPress={() => { hapticSelection(); setEnergy(v); }} style={[styles.ratingButton, energy === v && styles.ratingButtonActive]}>
                   <Text style={[styles.ratingButtonText, energy === v && styles.ratingButtonTextActive]}>{v}</Text>
                 </Pressable>
               ))}
