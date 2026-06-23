@@ -2,6 +2,50 @@ import { useState, useEffect } from 'react';
 import { getDatabase } from '@/lib/database/client';
 import { Symptom, Trigger, Medication, Condition } from '@/types';
 
+const SYMPTOM_COLUMNS = `
+  id, 
+  condition_id as conditionId, 
+  name, 
+  display_name as displayName, 
+  description, 
+  category, 
+  is_enabled as isEnabled, 
+  is_custom as isCustom, 
+  sort_order as sortOrder, 
+  created_at as createdAt
+`;
+
+const TRIGGER_COLUMNS = `
+  id, 
+  name, 
+  display_name as displayName, 
+  category, 
+  input_type as inputType, 
+  is_enabled as isEnabled, 
+  is_custom as isCustom, 
+  sort_order as sortOrder, 
+  created_at as createdAt
+`;
+
+const MEDICATION_COLUMNS = `
+  id, 
+  name, 
+  dosage, 
+  frequency, 
+  purpose, 
+  reminder_time as reminderTime, 
+  is_active as isActive, 
+  created_at as createdAt
+`;
+
+const CONDITION_COLUMNS = `
+  id, 
+  name, 
+  display_name as displayName, 
+  description, 
+  is_active as isActive
+`;
+
 export function useSymptoms() {
   const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -10,7 +54,7 @@ export function useSymptoms() {
     async function fetch() {
       const db = await getDatabase();
       const rows = await db.getAllAsync<Symptom>(
-        'SELECT * FROM symptoms WHERE is_enabled = 1 ORDER BY sort_order'
+        `SELECT ${SYMPTOM_COLUMNS} FROM symptoms WHERE is_enabled = 1 ORDER BY sort_order`
       );
       setSymptoms(rows);
       setLoading(false);
@@ -35,7 +79,7 @@ export function useTriggers() {
     async function fetch() {
       const db = await getDatabase();
       const rows = await db.getAllAsync<Trigger>(
-        'SELECT * FROM triggers WHERE is_enabled = 1 ORDER BY sort_order'
+        `SELECT ${TRIGGER_COLUMNS} FROM triggers WHERE is_enabled = 1 ORDER BY sort_order`
       );
       setTriggers(rows);
       setLoading(false);
@@ -60,7 +104,7 @@ export function useMedications() {
     async function fetch() {
       const db = await getDatabase();
       const rows = await db.getAllAsync<Medication>(
-        'SELECT * FROM medications WHERE is_active = 1 ORDER BY created_at DESC'
+        `SELECT ${MEDICATION_COLUMNS} FROM medications WHERE is_active = 1 ORDER BY created_at DESC`
       );
       setMedications(rows);
       setLoading(false);
@@ -78,7 +122,9 @@ export function useConditions() {
   useEffect(() => {
     async function fetch() {
       const db = await getDatabase();
-      const rows = await db.getAllAsync<Condition>('SELECT * FROM conditions WHERE is_active = 1');
+      const rows = await db.getAllAsync<Condition>(
+        `SELECT ${CONDITION_COLUMNS} FROM conditions WHERE is_active = 1`
+      );
       setConditions(rows);
       setLoading(false);
     }

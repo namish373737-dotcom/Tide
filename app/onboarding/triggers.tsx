@@ -14,7 +14,9 @@ export default function TriggersScreen() {
   useEffect(() => {
     async function fetch() {
       const db = await getDatabase();
-      const rows = await db.getAllAsync<Trigger>('SELECT * FROM triggers ORDER BY sort_order');
+      const rows = await db.getAllAsync<Trigger>(
+        'SELECT id, name, display_name as displayName, category, input_type as inputType, is_enabled as isEnabled, is_custom as isCustom, sort_order as sortOrder, created_at as createdAt FROM triggers ORDER BY sort_order'
+      );
       setTriggers(rows); setLoading(false);
     }
     fetch();

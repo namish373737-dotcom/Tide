@@ -24,7 +24,7 @@ export function useDailyEntry(date: number) {
     const db = await getDatabase();
     
     const entryRow = await db.getFirstAsync<DailyEntry>(
-      'SELECT id, entry_date, notes, mood, energy, sleep_hours, steps, resting_heart_rate, created_at, updated_at FROM daily_entries WHERE entry_date = ?',
+      'SELECT id, entry_date as entryDate, notes, mood, energy, sleep_hours as sleepHours, steps, resting_heart_rate as restingHeartRate, created_at as createdAt, updated_at as updatedAt FROM daily_entries WHERE entry_date = ?',
       [date]
     );
 

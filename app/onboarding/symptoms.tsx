@@ -21,7 +21,7 @@ export default function SymptomsScreen() {
       if (conditionIds.length === 0) { setSymptoms([]); setLoading(false); return; }
       const placeholders = conditionIds.map(() => '?').join(',');
       const rows = await db.getAllAsync<Symptom>(
-        `SELECT * FROM symptoms WHERE condition_id IN (${placeholders}) ORDER BY sort_order`, conditionIds
+        `SELECT id, condition_id as conditionId, name, display_name as displayName, description, category, is_enabled as isEnabled, is_custom as isCustom, sort_order as sortOrder, created_at as createdAt FROM symptoms WHERE condition_id IN (${placeholders}) ORDER BY sort_order`, conditionIds
       );
       setSymptoms(rows); setLoading(false);
     }
