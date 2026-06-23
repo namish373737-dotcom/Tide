@@ -5,7 +5,7 @@ import { getDatabase } from '@/lib/database/client';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { Shield, FileText, Trash2, Moon, Bell, Heart, ChevronRight, Fingerprint, Cloud, Lock } from 'lucide-react-native';
+import { Shield, FileText, Trash2, Moon, Bell, Heart, ChevronRight, Fingerprint, Cloud, Lock, Pill } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 
 export default function SettingsScreen() {
@@ -112,6 +112,20 @@ export default function SettingsScreen() {
             onPress={() => toggleReminder(!settings?.reminder_enabled)}
             toggle
             value={!!settings?.reminder_enabled}
+          />
+        </View>
+
+        {/* Medications Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Pill size={20} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>Medications</Text>
+          </View>
+          <SettingRow
+            icon={<Pill size={20} color={COLORS.primary} />}
+            title="Manage Medications"
+            subtitle="Add or remove medications and supplements"
+            onPress={() => router.push('/medications')}
           />
         </View>
 
