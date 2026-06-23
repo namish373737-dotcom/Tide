@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, StatusBar, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSymptoms, useTriggers } from '@/hooks/useEntities';
 import { useDailyEntry } from '@/hooks/useDailyEntry';
@@ -42,15 +42,19 @@ export default function CheckInScreen() {
 
   const handleSave = async () => {
     setSaving(true);
-    await saveEntry({ notes, mood, energy });
-    for (const [sid, sev] of Object.entries(symptomValues)) { await saveSymptomLog(parseInt(sid), sev); }
-    for (const [tid, val] of Object.entries(triggerValues)) { await saveTriggerLog(parseInt(tid), val); }
-    
-    hapticSuccess();
-    await incrementCheckInCount();
-    
-    setSaving(false);
-    router.back();
+    try {
+      await saveEntry({ notes, mood, energy });
+      for (const [sid, sev] of Object.entries(symptomValues)) { await saveSymptomLog(parseInt(sid), sev); }
+      for (const [tid, val] of Object.entries(triggerValues)) { await saveTriggerLog(parseInt(tid), val); }
+      hapticSuccess();
+      await incrementCheckInCount();
+    } catch (e) {
+      console.error('Save failed:', e);
+      Alert.alert('Save Failed', 'Something went wrong saving your check-in. Please try again.');
+    } finally {
+      setSaving(false);
+      router.back();
+    }
   };
 
   const dateObj = new Date(Math.floor(dateInt / 10000), Math.floor((dateInt % 10000) / 100) - 1, dateInt % 100);

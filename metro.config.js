@@ -9,6 +9,4 @@ config.resolver.extraNodeModules = {
   '@': path.resolve(__dirname, 'src'),
 };
 
-config.watchFolders = [path.resolve(__dirname, 'src')];
-
 module.exports = config;

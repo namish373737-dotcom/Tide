@@ -61,7 +61,7 @@ export default function InsightsScreen() {
             <Text style={styles.proDescription}>Upgrade to Pro to see advanced correlations, cycle overlays, and medication efficacy reports.</Text>
             <Pressable style={({ pressed }) => [styles.proButton, pressed && styles.proButtonPressed]}>
               <Zap size={16} color={COLORS.white} />
-              <Text style={styles.proButtonText}>Upgrade to Pro — $4.99/mo</Text>
+              <Text style={styles.proButtonText}>Upgrade to Pro</Text>
             </Pressable>
           </View>
         )}

@@ -28,7 +28,6 @@
   "include": [
     "app/**/*",
     "src/**/*",
-    "assets/**/*",
-    "nativewind-env.d.ts"
+    "assets/**/*"
   ]
 }

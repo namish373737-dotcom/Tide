@@ -16,13 +16,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tide.app",
-      "infoPlist": {
-        "NSHealthShareUsageDescription": "Tide reads your sleep, steps, and heart rate data to help identify patterns with your symptoms.",
-        "NSHealthUpdateUsageDescription": "Tide can write symptom data back to Apple Health.",
-        "NSFaceIDUsageDescription": "Tide uses Face ID to protect your private health data.",
-        "NSUserNotificationUsageDescription": "Tide sends daily reminders to help you stay consistent with your symptom tracking."
-      }
+      "bundleIdentifier": "com.tide.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -38,8 +32,7 @@
       "expo-router",
       "expo-local-authentication",
       "expo-notifications",
-      "expo-sqlite",
-      "@sentry/react-native"
+      "expo-sqlite"
     ],
     "scheme": "tide"
   }
