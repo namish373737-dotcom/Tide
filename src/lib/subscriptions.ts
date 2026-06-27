@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 import { getDatabase } from '@/lib/database/client';
-import * as Notifications from 'expo-notifications';
 
 let revenueCatConfigured = false;
 
@@ -34,6 +32,18 @@ export function useRevenueCat() {
     init();
   }, []);
 
+  const syncProStatus = async (info: any) => {
+    const db = await getDatabase();
+    const active = info?.entitlements?.active?.pro === true;
+    const expiry = info?.entitlements?.active?.pro?.expirationDate
+      ? new Date(info.entitlements.active.pro.expirationDate).getTime()
+      : null;
+    await db.runAsync(
+      'UPDATE user_settings SET pro_subscription_status = ?, pro_subscription_expiry = ?',
+      [active ? 'active' : 'inactive', expiry]
+    );
+  };
+
   const purchase = async (packageIdentifier: string) => {
     try {
       const RevenueCat = await import('react-native-purchases');
@@ -42,6 +52,7 @@ export function useRevenueCat() {
         offerings.current.availablePackages.find((p: any) => p.identifier === packageIdentifier)
       );
       setCustomerInfo(customerInfo);
+      await syncProStatus(customerInfo);
       return { success: true, customerInfo };
     } catch (e: any) {
       if (e.userCancelled) {
@@ -57,44 +68,14 @@ export function useRevenueCat() {
       const Purchases = RevenueCat.default;
       const customerInfo = await Purchases.restorePurchases();
       setCustomerInfo(customerInfo);
+      await syncProStatus(customerInfo);
       return { success: true, customerInfo };
     } catch (e: any) {
       return { success: false, error: e.message };
-    };
+    }
   };
 
   const isPro = customerInfo?.entitlements?.active?.pro === true;
 
   return { offerings, customerInfo, loading, purchase, restore, isPro };
-}
-
-export async function requestNotificationPermissions(): Promise<boolean> {
-  if (Platform.OS === 'ios') {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    return finalStatus === 'granted';
-  }
-  return true;
-}
-
-export async function scheduleDailyReminder(time: string = '21:00'): Promise<string> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
-  const [hours, minutes] = time.split(':').map(Number);
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: 'Time for your daily check-in',
-      body: 'Track your symptoms in under 60 seconds.',
-      sound: 'default',
-    },
-    trigger: { type: 'daily', hour: hours, minute: minutes } as any,
-  });
-  return id;
-}
-
-export async function cancelAllNotifications(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
 }

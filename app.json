@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0D7377"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -32,7 +27,15 @@
       "expo-router",
       "expo-local-authentication",
       "expo-notifications",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0D7377"
+        }
+      ]
     ],
     "scheme": "tide"
   }

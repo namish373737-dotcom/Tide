@@ -36,6 +36,8 @@ async function initializeSchema(): Promise<void> {
       dark_mode_preference TEXT DEFAULT 'system',
       pro_subscription_status TEXT DEFAULT 'inactive',
       pro_subscription_expiry INTEGER,
+      last_review_prompt INTEGER DEFAULT 0,
+      check_in_count INTEGER DEFAULT 0,
       created_at INTEGER DEFAULT (unixepoch()),
       updated_at INTEGER DEFAULT (unixepoch())
     );
@@ -157,6 +159,17 @@ async function initializeSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_medication_logs_medication ON medication_logs(medication_id);
     CREATE INDEX IF NOT EXISTS idx_daily_entries_date ON daily_entries(entry_date);
   `);
+
+  await addColumnIfMissing('user_settings', 'last_review_prompt', 'INTEGER DEFAULT 0');
+  await addColumnIfMissing('user_settings', 'check_in_count', 'INTEGER DEFAULT 0');
+}
+
+async function addColumnIfMissing(table: string, column: string, definition: string): Promise<void> {
+  if (!db) return;
+  const columns = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  if (!columns.some(c => c.name === column)) {
+    await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
 
 export async function seedDatabase(): Promise<void> {

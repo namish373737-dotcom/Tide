@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar } from 'react-native';
+import { router } from 'expo-router';
 import { getDatabase } from '@/lib/database/client';
 import { TrendingUp, AlertCircle, Lock, Zap } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
@@ -59,7 +60,7 @@ export default function InsightsScreen() {
               <Text style={styles.proTitle}>Pro Feature</Text>
             </View>
             <Text style={styles.proDescription}>Upgrade to Pro to see advanced correlations, cycle overlays, and medication efficacy reports.</Text>
-            <Pressable style={({ pressed }) => [styles.proButton, pressed && styles.proButtonPressed]}>
+            <Pressable onPress={() => router.push('/paywall')} style={({ pressed }) => [styles.proButton, pressed && styles.proButtonPressed]}>
               <Zap size={16} color={COLORS.white} />
               <Text style={styles.proButtonText}>Upgrade to Pro</Text>
             </Pressable>
