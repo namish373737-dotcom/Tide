@@ -2,10 +2,8 @@ import { View, Text, Pressable, ScrollView, StyleSheet, Alert, StatusBar } from 
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { getDatabase } from '@/lib/database/client';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { Shield, FileText, Trash2, Moon, Bell, Heart, ChevronRight, Fingerprint, Cloud, Lock, Pill, Download, Upload } from 'lucide-react-native';
+import { Shield, Trash2, Bell, Heart, ChevronRight, Fingerprint, Cloud, Lock, Pill, Download, Upload } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 import { APP_NAME, APP_VERSION } from '@/lib/constants';
 import { exportBackup, importBackup } from '@/lib/backup';
@@ -26,15 +24,6 @@ export default function SettingsScreen() {
     }
     fetch();
   }, []);
-
-  const handleExport = async () => {
-    const db = await getDatabase();
-    const entries = await db.getAllAsync('SELECT * FROM daily_entries ORDER BY entry_date DESC');
-    const json = JSON.stringify(entries, null, 2);
-    const fileUri = (FileSystem as any).documentDirectory + `${APP_NAME.toLowerCase()}_export.json`;
-    await FileSystem.writeAsStringAsync(fileUri, json);
-    await Sharing.shareAsync(fileUri);
-  };
 
   const handleDeleteAll = () => {
     Alert.alert('Delete All Data', 'This will permanently delete all your health data. This cannot be undone.', [
@@ -138,7 +127,6 @@ export default function SettingsScreen() {
             <Text style={styles.sectionTitle}>Privacy</Text>
           </View>
           <Text style={styles.sectionDescription}>Your data is stored only on this device. We do not collect, share, or sell your health information.</Text>
-          <SettingRow icon={<FileText size={20} color={COLORS.primary} />} title="Export Data" subtitle="Download all your data as a JSON file" onPress={handleExport} />
           {biometricAvailable && (
             <SettingRow icon={<Fingerprint size={20} color={COLORS.primary} />} title="Biometric Lock" subtitle={settings?.biometric_lock_enabled ? 'Face ID / Touch ID is enabled' : 'Require Face ID or Touch ID to open the app'}
               onPress={toggleBiometric} toggle value={!!settings?.biometric_lock_enabled} />
