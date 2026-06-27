@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Tide",
-    "slug": "tide",
+    "name": "Solace",
+    "slug": "solace",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,14 +11,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tide.app"
+      "bundleIdentifier": "com.solace.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0D7377"
       },
-      "package": "com.tide.app"
+      "package": "com.solace.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -37,6 +37,6 @@
         }
       ]
     ],
-    "scheme": "tide"
+    "scheme": "solace"
   }
 }

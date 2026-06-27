@@ -5,8 +5,10 @@ import { getDatabase } from '@/lib/database/client';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { Shield, FileText, Trash2, Moon, Bell, Heart, ChevronRight, Fingerprint, Cloud, Lock, Pill } from 'lucide-react-native';
+import { Shield, FileText, Trash2, Moon, Bell, Heart, ChevronRight, Fingerprint, Cloud, Lock, Pill, Download, Upload } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
+import { APP_NAME, APP_VERSION } from '@/lib/constants';
+import { exportBackup, importBackup } from '@/lib/backup';
 
 export default function SettingsScreen() {
   const [settings, setSettings] = useState<any>(null);
@@ -29,7 +31,7 @@ export default function SettingsScreen() {
     const db = await getDatabase();
     const entries = await db.getAllAsync('SELECT * FROM daily_entries ORDER BY entry_date DESC');
     const json = JSON.stringify(entries, null, 2);
-    const fileUri = (FileSystem as any).documentDirectory + 'tide_export.json';
+    const fileUri = (FileSystem as any).documentDirectory + `${APP_NAME.toLowerCase()}_export.json`;
     await FileSystem.writeAsStringAsync(fileUri, json);
     await Sharing.shareAsync(fileUri);
   };
@@ -147,6 +149,47 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* Data Backup */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Cloud size={20} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>Data</Text>
+          </View>
+          <SettingRow
+            icon={<Download size={20} color={COLORS.primary} />}
+            title="Export Backup"
+            subtitle="Save a full JSON backup of all your data"
+            onPress={async () => {
+              try { await exportBackup(); }
+              catch (e: any) { Alert.alert('Export Failed', e?.message ?? 'Could not export backup.'); }
+            }}
+          />
+          <SettingRow
+            icon={<Upload size={20} color={COLORS.primary} />}
+            title="Import Backup"
+            subtitle="Restore from a previous backup file"
+            onPress={() => {
+              Alert.alert(
+                'Import Backup?',
+                'This will overwrite all data currently on this device. Continue?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Import', style: 'destructive', onPress: async () => {
+                      try {
+                        await importBackup();
+                        Alert.alert('Import Complete', 'Your data has been restored.');
+                      } catch (e: any) {
+                        Alert.alert('Import Failed', e?.message ?? 'Could not import backup.');
+                      }
+                    },
+                  },
+                ]
+              );
+            }}
+          />
+        </View>
+
         {/* Data Management */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -163,14 +206,14 @@ export default function SettingsScreen() {
             <Heart size={20} color={COLORS.primary} />
             <Text style={styles.sectionTitle}>About</Text>
           </View>
-          <Text style={styles.sectionDescription}>Tide is built for people living with chronic conditions. We believe your health data belongs to you and no one else.</Text>
-          <Text style={styles.versionText}>Version 1.0.0</Text>
+          <Text style={styles.sectionDescription}>{APP_NAME} is built for people living with chronic conditions. We believe your health data belongs to you and no one else.</Text>
+          <Text style={styles.versionText}>Version {APP_VERSION}</Text>
         </View>
 
         {/* Medical Disclaimer */}
         <View style={styles.disclaimer}>
           <Text style={styles.disclaimerText}>
-            <Text style={styles.disclaimerBold}>Medical Disclaimer:</Text> Tide is for informational purposes only and does not provide medical advice. Always consult a qualified healthcare professional.
+            <Text style={styles.disclaimerBold}>Medical Disclaimer:</Text> {APP_NAME} is for informational purposes only and does not provide medical advice. Always consult a qualified healthcare professional.
           </Text>
         </View>
       </ScrollView>

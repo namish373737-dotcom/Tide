@@ -4,7 +4,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
-  db = await SQLite.openDatabaseAsync('tide.db');
+  db = await SQLite.openDatabaseAsync('solace.db');
   await initializeSchema();
   await seedDatabase();
   return db;

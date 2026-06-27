@@ -1,5 +1,5 @@
 {
-  "name": "src",
+  "name": "solace",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
@@ -8,6 +8,7 @@
     "date-fns": "^4.4.0",
     "expo": "~56.0.12",
     "expo-constants": "^56.0.18",
+    "expo-document-picker": "~14.0.0",
     "expo-file-system": "^56.0.8",
     "expo-haptics": "^56.0.3",
     "expo-linking": "~56.0.14",

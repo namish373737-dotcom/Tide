@@ -10,6 +10,7 @@ import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/them
 
 import { hapticSuccess, hapticSelection } from '@/lib/haptics';
 import { useInAppReview, incrementCheckInCount } from '@/lib/reviews';
+import { fetchTodayHealthData, isHealthKitAvailable } from '@/lib/healthkit';
 
 export default function CheckInScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
@@ -24,6 +25,24 @@ export default function CheckInScreen() {
   const [symptomValues, setSymptomValues] = useState<Record<number, number>>({});
   const [triggerValues, setTriggerValues] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
+  const [steps, setSteps] = useState<number | null>(null);
+  const [restingHeartRate, setRestingHeartRate] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isHealthKitAvailable()) return;
+    const today = new Date();
+    const todayInt = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    if (dateInt !== todayInt) return;
+    fetchTodayHealthData().then(data => {
+      if (data.steps !== null) setSteps(data.steps);
+      if (data.restingHeartRate !== null) setRestingHeartRate(data.restingHeartRate);
+    }).catch(() => {});
+  }, [dateInt]);
+
+  useEffect(() => {
+    if (entry?.steps != null) setSteps(entry.steps);
+    if (entry?.restingHeartRate != null) setRestingHeartRate(entry.restingHeartRate);
+  }, [entry]);
 
   useEffect(() => {
     if (!loading) {
@@ -43,7 +62,7 @@ export default function CheckInScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveEntry({ notes, mood, energy });
+      await saveEntry({ notes, mood, energy, steps: steps ?? undefined, restingHeartRate: restingHeartRate ?? undefined });
       for (const [sid, sev] of Object.entries(symptomValues)) { await saveSymptomLog(parseInt(sid), sev); }
       for (const [tid, val] of Object.entries(triggerValues)) { await saveTriggerLog(parseInt(tid), val); }
       hapticSuccess();
@@ -220,56 +239,163 @@ function MedicationSection({ entryId, dateInt }: { entryId?: number; dateInt: nu
   );
 }
 
+const FLOW_LEVELS: { value: 'none' | 'spotting' | 'light' | 'medium' | 'heavy'; label: string; color: string }[] = [
+  { value: 'none', label: 'None', color: COLORS.textTertiary },
+  { value: 'spotting', label: 'Spotting', color: '#FED7D7' },
+  { value: 'light', label: 'Light', color: '#FBD38D' },
+  { value: 'medium', label: 'Medium', color: '#F6AD55' },
+  { value: 'heavy', label: 'Heavy', color: '#E53E3E' },
+];
+
+const PHASES: { value: 'menstrual' | 'follicular' | 'ovulatory' | 'luteal'; label: string }[] = [
+  { value: 'menstrual', label: 'Menstrual' },
+  { value: 'follicular', label: 'Follicular' },
+  { value: 'ovulatory', label: 'Ovulatory' },
+  { value: 'luteal', label: 'Luteal' },
+];
+
+const OVULATION_OPTIONS: { value: 'positive' | 'negative' | 'none'; label: string }[] = [
+  { value: 'positive', label: 'Positive' },
+  { value: 'negative', label: 'Negative' },
+  { value: 'none', label: 'Not tested' },
+];
+
+const MUCUS_OPTIONS = ['dry', 'sticky', 'creamy', 'watery', 'egg_white'];
+const MUCUS_LABELS: Record<string, string> = {
+  dry: 'Dry', sticky: 'Sticky', creamy: 'Creamy', watery: 'Watery', egg_white: 'Egg white',
+};
+
 function CycleSection({ entryId, dateInt }: { entryId?: number; dateInt: number }) {
   const [flowLevel, setFlowLevel] = useState<string | null>(null);
-  const levels = [
-    { value: 'none', label: 'None', color: COLORS.textTertiary },
-    { value: 'spotting', label: 'Spotting', color: '#FCD34D' },
-    { value: 'light', label: 'Light', color: '#FBBF24' },
-    { value: 'medium', label: 'Medium', color: '#F59E0B' },
-    { value: 'heavy', label: 'Heavy', color: '#EF4444' },
-  ];
+  const [phase, setPhase] = useState<string | null>(null);
+  const [ovulationTest, setOvulationTest] = useState<'positive' | 'negative' | 'none'>('none');
+  const [cervicalMucus, setCervicalMucus] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     async function fetch() {
-      if (!entryId) return;
+      if (!entryId) { setLoaded(true); return; }
       const db = await getDatabase();
-      const log = await db.getFirstAsync<any>('SELECT flow_level FROM cycle_logs WHERE daily_entry_id = ?', [entryId]);
-      if (log) setFlowLevel(log.flow_level);
+      const log = await db.getFirstAsync<any>(
+        'SELECT flow_level, phase, ovulation_test, cervical_mucus FROM cycle_logs WHERE daily_entry_id = ?',
+        [entryId]
+      );
+      if (log) {
+        setFlowLevel(log.flow_level ?? null);
+        setPhase(log.phase ?? null);
+        setOvulationTest(log.ovulation_test === 1 ? 'positive' : log.ovulation_test === 0 ? 'negative' : 'none');
+        setCervicalMucus(log.cervical_mucus ?? null);
+      }
+      setLoaded(true);
     }
     fetch();
   }, [entryId]);
 
-  const selectFlow = async (value: string) => {
+  const upsert = async (updates: { flow_level?: string | null; phase?: string | null; ovulation_test?: number | null; cervical_mucus?: string | null }) => {
     const db = await getDatabase();
-    const newLevel = flowLevel === value ? null : value;
     let eid = entryId;
     if (!eid) {
       const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM daily_entries WHERE entry_date = ?', [dateInt]);
-      if (existing) {
-        eid = existing.id;
-      } else {
+      if (existing) eid = existing.id;
+      else {
         const result = await db.runAsync('INSERT INTO daily_entries (entry_date) VALUES (?)', [dateInt]);
         eid = result.lastInsertRowId;
       }
     }
-    if (newLevel) {
-      await db.runAsync('INSERT OR REPLACE INTO cycle_logs (daily_entry_id, flow_level) VALUES (?, ?)', [eid, newLevel]);
-    } else {
+    const existing = await db.getFirstAsync<any>('SELECT flow_level, phase, ovulation_test, cervical_mucus FROM cycle_logs WHERE daily_entry_id = ?', [eid]);
+    const merged = {
+      flow_level: updates.flow_level !== undefined ? updates.flow_level : existing?.flow_level ?? null,
+      phase: updates.phase !== undefined ? updates.phase : existing?.phase ?? null,
+      ovulation_test: updates.ovulation_test !== undefined ? updates.ovulation_test : existing?.ovulation_test ?? null,
+      cervical_mucus: updates.cervical_mucus !== undefined ? updates.cervical_mucus : existing?.cervical_mucus ?? null,
+    };
+    const allNull = merged.flow_level === null && merged.phase === null && merged.ovulation_test === null && merged.cervical_mucus === null;
+    if (allNull) {
       await db.runAsync('DELETE FROM cycle_logs WHERE daily_entry_id = ?', [eid]);
+    } else {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO cycle_logs (daily_entry_id, flow_level, phase, ovulation_test, cervical_mucus) VALUES (?, ?, ?, ?, ?)',
+        [eid, merged.flow_level, merged.phase, merged.ovulation_test, merged.cervical_mucus]
+      );
     }
-    setFlowLevel(newLevel);
   };
+
+  const selectFlow = async (value: string) => {
+    hapticSelection();
+    const newLevel = flowLevel === value ? null : value;
+    setFlowLevel(newLevel);
+    await upsert({ flow_level: newLevel });
+  };
+  const selectPhase = async (value: string) => {
+    hapticSelection();
+    const newPhase = phase === value ? null : value;
+    setPhase(newPhase);
+    await upsert({ phase: newPhase });
+  };
+  const selectOvulation = async (value: 'positive' | 'negative' | 'none') => {
+    hapticSelection();
+    setOvulationTest(value);
+    await upsert({ ovulation_test: value === 'positive' ? 1 : value === 'negative' ? 0 : null });
+  };
+  const selectMucus = async (value: string) => {
+    hapticSelection();
+    const newMucus = cervicalMucus === value ? null : value;
+    setCervicalMucus(newMucus);
+    await upsert({ cervical_mucus: newMucus });
+  };
+
+  if (!loaded) {
+    return <Text style={styles.emptyText}>Loading…</Text>;
+  }
 
   return (
     <View>
       <Text style={styles.cycleLabel}>Flow Level</Text>
-      <View style={styles.cycleRow}>
-        {levels.map(level => (
-          <Pressable key={level.value} onPress={() => selectFlow(level.value)} style={[styles.cycleButton, flowLevel === level.value && { backgroundColor: level.color, borderColor: level.color }]}>
-            <Text style={[styles.cycleButtonText, flowLevel === level.value && styles.cycleButtonTextActive]}>{level.label}</Text>
-          </Pressable>
-        ))}
+      <View style={styles.pillRow}>
+        {FLOW_LEVELS.map(level => {
+          const active = flowLevel === level.value;
+          return (
+            <Pressable key={level.value} onPress={() => selectFlow(level.value)} style={[styles.pill, active && { backgroundColor: level.color, borderColor: level.color }]}>
+              <Text style={[styles.pillText, active && styles.pillTextActive]}>{level.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.cycleLabel, { marginTop: SPACING.lg }]}>Phase</Text>
+      <View style={styles.pillRow}>
+        {PHASES.map(p => {
+          const active = phase === p.value;
+          return (
+            <Pressable key={p.value} onPress={() => selectPhase(p.value)} style={[styles.pill, active && styles.pillActive]}>
+              <Text style={[styles.pillText, active && styles.pillTextActive]}>{p.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.cycleLabel, { marginTop: SPACING.lg }]}>Ovulation Test</Text>
+      <View style={styles.pillRow}>
+        {OVULATION_OPTIONS.map(o => {
+          const active = ovulationTest === o.value;
+          return (
+            <Pressable key={o.value} onPress={() => selectOvulation(o.value)} style={[styles.pill, active && styles.pillActive]}>
+              <Text style={[styles.pillText, active && styles.pillTextActive]}>{o.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.cycleLabel, { marginTop: SPACING.lg }]}>Cervical Mucus</Text>
+      <View style={styles.pillRow}>
+        {MUCUS_OPTIONS.map(m => {
+          const active = cervicalMucus === m;
+          return (
+            <Pressable key={m} onPress={() => selectMucus(m)} style={[styles.pill, active && styles.pillActive]}>
+              <Text style={[styles.pillText, active && styles.pillTextActive]}>{MUCUS_LABELS[m]}</Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
@@ -323,8 +449,9 @@ const styles = StyleSheet.create({
   medCheckActive: { backgroundColor: COLORS.success, borderColor: COLORS.success },
   medCheckMark: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
   cycleLabel: { ...TYPOGRAPHY.label, color: COLORS.textSecondary, marginBottom: SPACING.sm },
-  cycleRow: { flexDirection: 'row', justifyContent: 'space-between', gap: SPACING.sm },
-  cycleButton: { flex: 1, paddingVertical: SPACING.md, borderRadius: RADIUS.lg, backgroundColor: COLORS.surfaceElevated, borderWidth: 1.5, borderColor: COLORS.border, alignItems: 'center' },
-  cycleButtonText: { ...TYPOGRAPHY.label, color: COLORS.text },
-  cycleButtonTextActive: { color: COLORS.white, fontWeight: '700' },
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  pill: { paddingHorizontal: SPACING.base, paddingVertical: SPACING.sm + 2, borderRadius: RADIUS.full, backgroundColor: COLORS.surfaceElevated, borderWidth: 1.5, borderColor: COLORS.border },
+  pillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  pillText: { ...TYPOGRAPHY.label, color: COLORS.text },
+  pillTextActive: { color: COLORS.white, fontWeight: '700' },
 });

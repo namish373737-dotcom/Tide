@@ -1,35 +1,61 @@
-import { useState, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { getDatabase } from '@/lib/database/client';
-import { TrendingUp, AlertCircle, Lock, Zap } from 'lucide-react-native';
+import { TrendingUp, Lock, Zap, Moon, RefreshCw } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
+import { generateInsights, getCachedInsights, Insight } from '@/lib/insights';
+import { format } from 'date-fns';
 
 export default function InsightsScreen() {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [hasEnoughData, setHasEnoughData] = useState(false);
-  const [insights, setInsights] = useState<any[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [generatedAt, setGeneratedAt] = useState<number | null>(null);
   const [isPro, setIsPro] = useState(false);
 
-  useEffect(() => {
-    async function fetchData() {
-      const db = await getDatabase();
-      const count = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM daily_entries');
-      setHasEnoughData((count?.count || 0) >= 7);
-      const settings = await db.getFirstAsync<{ pro_subscription_status: string }>('SELECT pro_subscription_status FROM user_settings LIMIT 1');
-      setIsPro(settings?.pro_subscription_status === 'active');
+  const load = useCallback(async () => {
+    setLoading(true);
+    const db = await getDatabase();
+    const count = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM daily_entries');
+    const enough = (count?.count || 0) >= 7;
+    setHasEnoughData(enough);
+    const settings = await db.getFirstAsync<{ pro_subscription_status: string }>('SELECT pro_subscription_status FROM user_settings LIMIT 1');
+    setIsPro(settings?.pro_subscription_status === 'active');
 
-      if ((count?.count || 0) >= 7) {
-        const entries = await db.getAllAsync<any>(
-          `SELECT de.entry_date, sl.severity, s.name as symptom_name, s.display_name as symptom_display, t.display_name as trigger_display, tl.value
-           FROM daily_entries de LEFT JOIN symptom_logs sl ON sl.daily_entry_id = de.id LEFT JOIN symptoms s ON s.id = sl.symptom_id
-           LEFT JOIN trigger_logs tl ON tl.daily_entry_id = de.id LEFT JOIN triggers t ON t.id = tl.trigger_id ORDER BY de.entry_date DESC LIMIT 30`
-        );
-        const triggerInsight = generateTriggerInsight(entries);
-        if (triggerInsight) setInsights([triggerInsight]);
+    if (enough) {
+      const cached = await getCachedInsights(db);
+      if (cached.insights.length > 0 && cached.generatedAt && (Date.now() / 1000 - cached.generatedAt < 24 * 60 * 60)) {
+        setInsights(cached.insights);
+        setGeneratedAt(cached.generatedAt);
+      } else {
+        const fresh = await generateInsights(db);
+        setInsights(fresh);
+        setGeneratedAt(Math.floor(Date.now() / 1000));
       }
     }
-    fetchData();
+    setLoading(false);
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const db = await getDatabase();
+    const fresh = await generateInsights(db);
+    setInsights(fresh);
+    setGeneratedAt(Math.floor(Date.now() / 1000));
+    setRefreshing(false);
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator color={COLORS.primary} />
+      </View>
+    );
+  }
 
   if (!hasEnoughData) {
     return (
@@ -47,82 +73,86 @@ export default function InsightsScreen() {
     );
   }
 
+  const visibleCount = isPro ? insights.length : Math.min(1, insights.length);
+  const lockedCount = isPro ? 0 : Math.max(0, insights.length - 1);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Insights</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Insights</Text>
+          <Pressable onPress={handleRefresh} disabled={refreshing} style={({ pressed }) => [styles.refreshButton, pressed && styles.pressed]}>
+            {refreshing ? <ActivityIndicator size="small" color={COLORS.primary} /> : <RefreshCw size={18} color={COLORS.primary} />}
+          </Pressable>
+        </View>
 
-        {!isPro && (
-          <View style={styles.proCard}>
-            <View style={styles.proHeader}>
-              <Lock size={20} color={COLORS.accent} />
-              <Text style={styles.proTitle}>Pro Feature</Text>
-            </View>
-            <Text style={styles.proDescription}>Upgrade to Pro to see advanced correlations, cycle overlays, and medication efficacy reports.</Text>
-            <Pressable onPress={() => router.push('/paywall')} style={({ pressed }) => [styles.proButton, pressed && styles.proButtonPressed]}>
-              <Zap size={16} color={COLORS.white} />
-              <Text style={styles.proButtonText}>Upgrade to Pro</Text>
-            </Pressable>
-          </View>
+        {generatedAt && (
+          <Text style={styles.timestamp}>Last updated {format(new Date(generatedAt * 1000), 'MMM d, h:mm a')}</Text>
         )}
-
-        {insights.map((insight, i) => (
-          <View key={i} style={styles.insightCard}>
-            <View style={styles.insightHeader}>
-              <AlertCircle size={20} color={COLORS.primary} />
-              <Text style={styles.insightTitle}>{insight.title}</Text>
-            </View>
-            <Text style={styles.insightDescription}>{insight.description}</Text>
-          </View>
-        ))}
 
         {insights.length === 0 && (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyDescription}>Log more symptoms and triggers to generate personalized insights.</Text>
+            <Text style={styles.emptyDescription}>No patterns detected yet. Keep logging — clearer signals appear after a few weeks of consistent data.</Text>
           </View>
+        )}
+
+        {insights.slice(0, visibleCount).map((insight, i) => (
+          <InsightCard key={i} insight={insight} />
+        ))}
+
+        {lockedCount > 0 && (
+          <>
+            {Array.from({ length: lockedCount }).map((_, i) => (
+              <View key={`locked-${i}`} style={styles.lockedCard}>
+                <Lock size={20} color={COLORS.accent} />
+                <Text style={styles.lockedTitle}>Pro insight locked</Text>
+                <Text style={styles.lockedText}>Upgrade to Pro to see all {insights.length} personalized insights.</Text>
+              </View>
+            ))}
+            <Pressable onPress={() => router.push('/paywall')} style={({ pressed }) => [styles.proButton, pressed && styles.pressed]}>
+              <Zap size={16} color={COLORS.white} />
+              <Text style={styles.proButtonText}>Upgrade to Pro</Text>
+            </Pressable>
+          </>
         )}
       </ScrollView>
     </View>
   );
 }
 
-function generateTriggerInsight(entries: any[]): { title: string; description: string } | null {
-  const symptomMap: Record<string, { trigger: string; count: number; total: number }> = {};
-  entries.forEach(row => {
-    if (row.symptom_name && row.trigger_display && row.value === 'true') {
-      const key = `${row.symptom_name}_${row.trigger_display}`;
-      if (!symptomMap[key]) symptomMap[key] = { trigger: row.trigger_display, count: 0, total: 0 };
-      if (row.severity >= 5) symptomMap[key].count++;
-      symptomMap[key].total++;
-    }
-  });
-  let bestInsight = null, bestRatio = 0;
-  for (const [key, data] of Object.entries(symptomMap)) {
-    if (data.total >= 3) {
-      const ratio = data.count / data.total;
-      if (ratio > bestRatio) { bestRatio = ratio; const symptomName = key.split('_')[0].replace(/_/g, ' '); bestInsight = { title: 'Trigger Pattern Found', description: `On ${Math.round(ratio * 100)}% of days you logged ${data.trigger}, your ${symptomName} severity was elevated. Keep tracking to confirm this pattern.` }; }
-    }
-  }
-  return bestInsight;
+function InsightCard({ insight }: { insight: Insight }) {
+  const Icon = insight.insightType === 'correlation' ? Zap : insight.insightType === 'trend' ? TrendingUp : Moon;
+  return (
+    <View style={styles.insightCard}>
+      <View style={styles.insightHeader}>
+        <Icon size={20} color={COLORS.primary} />
+        <Text style={styles.insightTitle}>{insight.title}</Text>
+      </View>
+      <Text style={styles.insightDescription}>{insight.description}</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  center: { alignItems: 'center', justifyContent: 'center' },
   scrollContent: { paddingHorizontal: LAYOUT.screenPadding, paddingTop: LAYOUT.safeTop, paddingBottom: LAYOUT.safeBottom + SPACING.xl },
-  title: { ...TYPOGRAPHY.h2, color: COLORS.text, marginBottom: SPACING.xl },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs },
+  title: { ...TYPOGRAPHY.h2, color: COLORS.text },
+  refreshButton: { padding: SPACING.sm, borderRadius: RADIUS.full, backgroundColor: COLORS.surfaceElevated },
+  pressed: { opacity: 0.7 },
+  timestamp: { ...TYPOGRAPHY.caption, color: COLORS.textTertiary, marginBottom: SPACING.xl },
   emptyCard: { backgroundColor: COLORS.surface, borderRadius: RADIUS.xl, padding: SPACING['2xl'], alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm },
   emptyTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, marginTop: SPACING.lg, marginBottom: SPACING.sm, textAlign: 'center' },
   emptyDescription: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 24 },
-  proCard: { backgroundColor: 'rgba(155, 89, 182, 0.08)', borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.xl, borderWidth: 1.5, borderColor: 'rgba(155, 89, 182, 0.2)', ...SHADOWS.sm },
-  proHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm },
-  proTitle: { ...TYPOGRAPHY.h4, color: COLORS.accent, marginLeft: SPACING.sm },
-  proDescription: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, marginBottom: SPACING.md, lineHeight: 22 },
-  proButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.accent, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, ...SHADOWS.md },
-  proButtonPressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
-  proButtonText: { ...TYPOGRAPHY.button, color: COLORS.white, marginLeft: SPACING.sm },
-  insightCard: { backgroundColor: COLORS.surface, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.xl, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm },
-  insightHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm },
-  insightTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginLeft: SPACING.sm },
+  insightCard: { backgroundColor: COLORS.surface, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.base, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm },
+  insightHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm, gap: SPACING.sm },
+  insightTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, flex: 1 },
   insightDescription: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, lineHeight: 22 },
+  lockedCard: { backgroundColor: 'rgba(155, 89, 182, 0.06)', borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.base, borderWidth: 1.5, borderColor: 'rgba(155, 89, 182, 0.2)', alignItems: 'center', gap: SPACING.xs },
+  lockedTitle: { ...TYPOGRAPHY.h4, color: COLORS.accent },
+  lockedText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, textAlign: 'center' },
+  proButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.accent, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, marginTop: SPACING.md, ...SHADOWS.md, gap: SPACING.sm },
+  proButtonText: { ...TYPOGRAPHY.button, color: COLORS.white },
 });

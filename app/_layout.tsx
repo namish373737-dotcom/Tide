@@ -4,10 +4,17 @@ import { StatusBar } from 'expo-status-bar';
 import { getDatabase } from '@/lib/database/client';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { COLORS } from '@/lib/theme';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
+  environment: __DEV__ ? 'development' : 'production',
+  tracesSampleRate: 0.2,
+});
 
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
@@ -45,6 +52,8 @@ export default function RootLayout() {
     </>
   );
 }
+
+export default Sentry.wrap(RootLayout);
 
 const styles = StyleSheet.create({
   loadingContainer: {

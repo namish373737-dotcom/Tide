@@ -5,6 +5,7 @@ import { X, Check, Sparkles, FileText, Brain, Pill, Infinity as InfinityIcon } f
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 import { useRevenueCat } from '@/lib/subscriptions';
 import { hapticSuccess, hapticSelection } from '@/lib/haptics';
+import { APP_NAME } from '@/lib/constants';
 
 const PERKS = [
   { icon: Brain, title: 'AI Pattern Insights', description: 'Discover hidden correlations between symptoms, triggers, and your cycle' },
@@ -57,7 +58,7 @@ export default function PaywallScreen() {
         <View style={styles.heroIcon}>
           <Sparkles size={32} color={COLORS.accent} />
         </View>
-        <Text style={styles.title}>Tide Pro</Text>
+        <Text style={styles.title}>{APP_NAME} Pro</Text>
         <Text style={styles.subtitle}>Understand your body, on your terms — your data never leaves this device.</Text>
 
         <View style={styles.perks}>
@@ -108,7 +109,7 @@ export default function PaywallScreen() {
           <Text style={styles.restoreButtonText}>Restore Purchase</Text>
         </Pressable>
 
-        <Text style={styles.disclaimer}>Cancel anytime. No medical claims are made — Tide is a self-tracking wellness tool, not a diagnostic device.</Text>
+        <Text style={styles.disclaimer}>Cancel anytime. No medical claims are made — {APP_NAME} is a self-tracking wellness tool, not a diagnostic device.</Text>
       </ScrollView>
     </View>
   );

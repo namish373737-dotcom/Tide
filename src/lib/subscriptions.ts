@@ -15,7 +15,7 @@ export function useRevenueCat() {
         const Purchases = RevenueCat.default;
         
         if (!revenueCatConfigured) {
-          Purchases.configure({ apiKey: 'appl_YOUR_REVENUECAT_API_KEY' });
+          Purchases.configure({ apiKey: process.env.EXPO_PUBLIC_REVENUECAT_APPLE_KEY ?? '' });
           revenueCatConfigured = true;
         }
 
