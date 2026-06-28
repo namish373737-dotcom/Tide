@@ -113,7 +113,7 @@ export default function PaywallScreen() {
           Solace Pro is an auto-renewable subscription. $4.99/month or $29.99/year. Payment will be charged to your Apple Account at confirmation of purchase. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Cancel anytime in your Apple ID settings.
         </Text>
 
-        <Text style={styles.disclaimer}>Cancel anytime. No medical claims are made — {APP_NAME} is a self-tracking wellness tool, not a diagnostic device.</Text>
+        <Text style={styles.disclaimer}>No medical claims are made — {APP_NAME} is a self-tracking wellness tool, not a diagnostic device.</Text>
       </ScrollView>
     </View>
   );

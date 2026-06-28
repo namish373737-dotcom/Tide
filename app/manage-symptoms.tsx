@@ -2,7 +2,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet, TextInput, StatusBar } f
 import { useState, useEffect, useCallback } from 'react';
 import { router } from 'expo-router';
 import { getDatabase } from '@/lib/database/client';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Trash2 } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 
 interface SymptomRow {
@@ -19,11 +19,35 @@ export default function ManageSymptomsScreen() {
 
   const load = useCallback(async () => {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<SymptomRow>(
-      'SELECT id, name, display_name, is_enabled, is_custom FROM symptoms ORDER BY is_custom DESC, display_name ASC'
+    const settings = await db.getFirstAsync<{ selected_conditions: string }>(
+      'SELECT selected_conditions FROM user_settings LIMIT 1'
     );
+    const selectedIds: number[] = settings?.selected_conditions
+      ? JSON.parse(settings.selected_conditions)
+      : [];
+
+    let rows: SymptomRow[];
+    if (selectedIds.length === 0) {
+      rows = await db.getAllAsync<SymptomRow>(
+        'SELECT id, name, display_name, is_enabled, is_custom FROM symptoms ORDER BY is_custom DESC, display_name ASC'
+      );
+    } else {
+      const placeholders = selectedIds.map(() => '?').join(',');
+      rows = await db.getAllAsync<SymptomRow>(
+        `SELECT id, name, display_name, is_enabled, is_custom FROM symptoms
+         WHERE condition_id IN (${placeholders}) OR condition_id IS NULL
+         ORDER BY is_custom DESC, display_name ASC`,
+        selectedIds
+      );
+    }
     setSymptoms(rows);
   }, []);
+
+  const deleteCustom = async (id: number) => {
+    const db = await getDatabase();
+    await db.runAsync('UPDATE symptoms SET is_enabled = 0, is_custom = 0 WHERE id = ? AND is_custom = 1', [id]);
+    setSymptoms(prev => prev.filter(s => s.id !== id));
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -68,6 +92,11 @@ export default function ManageSymptomsScreen() {
               <View style={[styles.toggle, s.is_enabled ? styles.toggleActive : null]}>
                 <View style={[styles.toggleDot, s.is_enabled ? styles.toggleDotActive : null]} />
               </View>
+              {s.is_custom === 1 && (
+                <Pressable onPress={() => deleteCustom(s.id)} style={styles.deleteButton}>
+                  <Trash2 size={18} color={COLORS.danger} />
+                </Pressable>
+              )}
             </Pressable>
           ))}
         </View>
@@ -110,4 +139,5 @@ const styles = StyleSheet.create({
   addButton: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, alignItems: 'center', ...SHADOWS.sm },
   addButtonDisabled: { backgroundColor: COLORS.border },
   addButtonText: { ...TYPOGRAPHY.button, color: COLORS.white },
+  deleteButton: { padding: SPACING.sm, marginLeft: SPACING.sm },
 });

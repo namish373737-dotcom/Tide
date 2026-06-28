@@ -142,7 +142,7 @@ export default function CheckInScreen() {
           <Text style={styles.cardTitle}>Symptoms</Text>
           {symptoms.length === 0 && (
             <Text style={styles.emptyText}>
-              No symptoms configured. Go to Settings → Reset Onboarding to add symptoms for your condition.
+              No symptoms configured. Go to Settings → Tracking → Manage Symptoms to enable symptoms.
             </Text>
           )}
           {symptoms.map(symptom => (

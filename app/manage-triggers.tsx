@@ -2,7 +2,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet, TextInput, StatusBar } f
 import { useState, useEffect, useCallback } from 'react';
 import { router } from 'expo-router';
 import { getDatabase } from '@/lib/database/client';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Trash2 } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 
 interface TriggerRow {
@@ -26,6 +26,12 @@ export default function ManageTriggersScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const deleteCustom = async (id: number) => {
+    const db = await getDatabase();
+    await db.runAsync('UPDATE triggers SET is_enabled = 0, is_custom = 0 WHERE id = ? AND is_custom = 1', [id]);
+    setTriggers(prev => prev.filter(t => t.id !== id));
+  };
 
   const toggle = async (t: TriggerRow) => {
     const db = await getDatabase();
@@ -68,6 +74,11 @@ export default function ManageTriggersScreen() {
               <View style={[styles.toggle, t.is_enabled ? styles.toggleActive : null]}>
                 <View style={[styles.toggleDot, t.is_enabled ? styles.toggleDotActive : null]} />
               </View>
+              {t.is_custom === 1 && (
+                <Pressable onPress={() => deleteCustom(t.id)} style={styles.deleteButton}>
+                  <Trash2 size={18} color={COLORS.danger} />
+                </Pressable>
+              )}
             </Pressable>
           ))}
         </View>
@@ -110,4 +121,5 @@ const styles = StyleSheet.create({
   addButton: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, alignItems: 'center', ...SHADOWS.sm },
   addButtonDisabled: { backgroundColor: COLORS.border },
   addButtonText: { ...TYPOGRAPHY.button, color: COLORS.white },
+  deleteButton: { padding: SPACING.sm, marginLeft: SPACING.sm },
 });

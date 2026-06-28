@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { getDatabase } from '@/lib/database/client';
 import { TrendingUp, Lock, Zap, Moon, RefreshCw } from 'lucide-react-native';
@@ -14,45 +14,77 @@ export default function InsightsScreen() {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [generatedAt, setGeneratedAt] = useState<number | null>(null);
   const [isPro, setIsPro] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const db = await getDatabase();
-    const count = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM daily_entries');
-    const enough = (count?.count || 0) >= 7;
-    setHasEnoughData(enough);
-    const settings = await db.getFirstAsync<{ pro_subscription_status: string }>('SELECT pro_subscription_status FROM user_settings LIMIT 1');
-    setIsPro(settings?.pro_subscription_status === 'active');
+    setError(null);
+    try {
+      const db = await getDatabase();
+      const count = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM daily_entries');
+      const enough = (count?.count || 0) >= 7;
+      setHasEnoughData(enough);
+      const settings = await db.getFirstAsync<{ pro_subscription_status: string }>('SELECT pro_subscription_status FROM user_settings LIMIT 1');
+      setIsPro(settings?.pro_subscription_status === 'active');
 
-    if (enough) {
-      const cached = await getCachedInsights(db);
-      if (cached.insights.length > 0 && cached.generatedAt && (Date.now() / 1000 - cached.generatedAt < 24 * 60 * 60)) {
-        setInsights(cached.insights);
-        setGeneratedAt(cached.generatedAt);
-      } else {
-        const fresh = await generateInsights(db);
-        setInsights(fresh);
-        setGeneratedAt(Math.floor(Date.now() / 1000));
+      if (enough) {
+        const cached = await getCachedInsights(db);
+        if (cached.insights.length > 0 && cached.generatedAt && (Date.now() / 1000 - cached.generatedAt < 24 * 60 * 60)) {
+          setInsights(cached.insights);
+          setGeneratedAt(cached.generatedAt);
+        } else {
+          const fresh = await generateInsights(db);
+          setInsights(fresh);
+          setGeneratedAt(Math.floor(Date.now() / 1000));
+        }
       }
+    } catch (e) {
+      setError('Failed to generate insights. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const db = await getDatabase();
-    const fresh = await generateInsights(db);
-    setInsights(fresh);
-    setGeneratedAt(Math.floor(Date.now() / 1000));
-    setRefreshing(false);
+    try {
+      const db = await getDatabase();
+      const fresh = await generateInsights(db);
+      setInsights(fresh);
+      setGeneratedAt(Math.floor(Date.now() / 1000));
+    } catch (e) {
+      Alert.alert('Refresh failed', 'Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
         <ActivityIndicator color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.title}>Insights</Text>
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyDescription}>{error}</Text>
+            <Pressable
+              onPress={() => { setError(null); load(); }}
+              style={({ pressed }) => [styles.proButton, pressed && styles.pressed, { marginTop: SPACING.lg }]}
+            >
+              <Text style={styles.proButtonText}>Try Again</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
       </View>
     );
   }

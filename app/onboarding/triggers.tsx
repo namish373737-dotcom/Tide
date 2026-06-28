@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar } from 'react-native';
 import { router } from 'expo-router';
 import { getDatabase } from '@/lib/database/client';
-import { Check, ChevronRight } from 'lucide-react-native';
+import { Check, ChevronRight, ChevronLeft } from 'lucide-react-native';
 import { Trigger } from '@/types';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 
@@ -61,6 +61,11 @@ export default function TriggersScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <View style={styles.backHeader}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <ChevronLeft size={28} color={COLORS.text} />
+        </Pressable>
+      </View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>What might affect your symptoms?</Text>
         <Text style={styles.subtitle}>Select triggers to track — we'll help you find patterns.</Text>
@@ -104,7 +109,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
-  scrollContent: { paddingHorizontal: LAYOUT.screenPadding, paddingTop: LAYOUT.safeTop, paddingBottom: 120 },
+  scrollContent: { paddingHorizontal: LAYOUT.screenPadding, paddingTop: SPACING.sm, paddingBottom: 120 },
+  backHeader: { paddingHorizontal: LAYOUT.screenPadding, paddingTop: LAYOUT.safeTop },
+  backButton: { padding: SPACING.sm, width: 44 },
   title: { ...TYPOGRAPHY.h2, color: COLORS.text, marginBottom: SPACING.sm },
   subtitle: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, marginBottom: SPACING.xl, lineHeight: 24 },
   cardsContainer: { gap: SPACING.base },
