@@ -36,13 +36,13 @@ export default function ReportScreen() {
       since.setDate(since.getDate() - days);
       const sinceInt = since.getFullYear() * 10000 + (since.getMonth() + 1) * 100 + since.getDate();
       const rows = await db.getAllAsync<any>(
-        `SELECT de.*,
+        `SELECT de.entry_date, de.notes, de.mood, de.energy, de.sleep_hours,
           (SELECT json_group_array(json_object('name', s.display_name, 'severity', sl.severity))
            FROM symptom_logs sl JOIN symptoms s ON s.id = sl.symptom_id
            WHERE sl.daily_entry_id = de.id) as symptoms_json,
           (SELECT json_group_array(t.display_name)
            FROM trigger_logs tl JOIN triggers t ON t.id = tl.trigger_id
-           WHERE tl.daily_entry_id = de.id AND tl.value = 'true') as triggers_json,
+           WHERE tl.daily_entry_id = de.id AND tl.value != 'false' AND tl.value != '0' AND tl.value IS NOT NULL) as triggers_json,
           (SELECT json_group_array(m.name)
            FROM medication_logs ml JOIN medications m ON m.id = ml.medication_id
            WHERE ml.daily_entry_id = de.id AND ml.taken = 1) as medications_json,
@@ -152,26 +152,35 @@ function buildHTML(entries: any[], medications: any[], days: number): string {
       </ul>
     </div>`;
 
+  const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const cellStyle = 'padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; vertical-align: top;';
+  const detailStyle = 'padding: 10px 14px 16px; background: #f7f7fb; border-bottom: 1px solid #e5e7eb; font-size: 13px; color: #1a1a2e; line-height: 1.5;';
+
   const rows = entries.map((e: any) => {
     const dateObj = new Date(Math.floor(e.entry_date / 10000), Math.floor((e.entry_date % 10000) / 100) - 1, e.entry_date % 100);
     const symptoms = JSON.parse(e.symptoms_json || '[]');
     const triggers = JSON.parse(e.triggers_json || '[]');
     const medsTaken = JSON.parse(e.medications_json || '[]');
-    const symptomText = symptoms.map((s: any) => `${s.name}: ${s.severity}/10`).join(', ') || 'None';
-    const triggerText = triggers.join(', ') || 'None';
+    const peakSeverity = symptoms.length > 0 ? Math.max(...symptoms.map((s: any) => s.severity)) : null;
     const cycleParts = [e.cycle_flow_level, e.cycle_phase].filter(Boolean);
     const cycleText = cycleParts.length > 0 ? cycleParts.join(' / ') : '-';
-    const medsText = medsTaken.join(', ') || '-';
+    const symptomText = symptoms.length > 0 ? symptoms.map((s: any) => `${escapeHtml(s.name)}: ${s.severity}/10`).join(', ') : 'None';
+    const triggerText = triggers.length > 0 ? triggers.map((t: string) => escapeHtml(t)).join(', ') : 'None';
+    const medsText = medsTaken.length > 0 ? medsTaken.map((m: string) => escapeHtml(m)).join(', ') : 'None';
+    const notesText = e.notes ? escapeHtml(e.notes) : '—';
     return `<tr>
-      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${format(dateObj, 'MMM d')}</td>
-      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${symptomText}</td>
-      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${triggerText}</td>
-      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${medsText}</td>
-      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${cycleText}</td>
-      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${e.mood ? e.mood + '/5' : '-'}</td>
-      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${e.energy ? e.energy + '/5' : '-'}</td>
-      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${e.notes || '-'}</td>
-    </tr>`;
+      <td style="${cellStyle}">${format(dateObj, 'MMM d')}</td>
+      <td style="${cellStyle}">${peakSeverity !== null ? peakSeverity + '/10' : '-'}</td>
+      <td style="${cellStyle}">${e.mood ? e.mood + '/5' : '-'}</td>
+      <td style="${cellStyle}">${e.sleep_hours ? e.sleep_hours + 'h' : '-'}</td>
+      <td style="${cellStyle}">${cycleText}</td>
+    </tr>
+    <tr><td colspan="5" style="${detailStyle}">
+      <div><strong>Symptoms:</strong> ${symptomText}</div>
+      <div><strong>Triggers:</strong> ${triggerText}</div>
+      <div><strong>Meds taken:</strong> ${medsText}</div>
+      <div><strong>Notes:</strong> ${notesText}</div>
+    </td></tr>`;
   }).join('');
 
   return `<html>
@@ -196,7 +205,7 @@ function buildHTML(entries: any[], medications: any[], days: number): string {
       <p><strong>Total Entries:</strong> ${entries.length}</p>
       ${medicationsSection}
       <table>
-        <tr><th>Date</th><th>Symptoms</th><th>Triggers</th><th>Medications</th><th>Cycle</th><th>Mood</th><th>Energy</th><th>Notes</th></tr>
+        <tr><th>Date</th><th>Peak Severity</th><th>Mood</th><th>Sleep</th><th>Cycle</th></tr>
         ${rows}
       </table>
       <div class="footer">

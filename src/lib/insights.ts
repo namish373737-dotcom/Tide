@@ -87,7 +87,10 @@ export async function generateInsights(db: SQLite.SQLiteDatabase): Promise<Insig
         const sym = symptomsByEntry.get(e.id)?.get(sid);
         const trg = triggersByEntry.get(e.id)?.get(tid);
         if (sym !== undefined) {
-          const triggerPresent = trg?.value === 'true' ? 1 : 0;
+          // Trigger "present" covers booleans ('true') and scale triggers with any
+          // non-zero numeric value. 'false'/'0'/null/undefined all count as absent.
+          const v = trg?.value ?? null;
+          const triggerPresent = v !== null && v !== 'false' && v !== '0' ? 1 : 0;
           xs.push(triggerPresent);
           ys.push(sym.severity);
           if (triggerPresent === 1) coOccurrences++;

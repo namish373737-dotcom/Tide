@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSymptoms } from '@/hooks/useEntities';
 import { useDailyEntry } from '@/hooks/useDailyEntry';
 import { getDatabase } from '@/lib/database/client';
@@ -27,39 +27,74 @@ export default function DashboardScreen() {
   const [streak, setStreak] = useState(0);
   const [weekData, setWeekData] = useState<{ date: number; logged: boolean; severity: number }[]>([]);
 
-  useEffect(() => {
-    async function calculateStreak() {
-      const db = await getDatabase();
-      const entries = await db.getAllAsync<{ entry_date: number }>('SELECT entry_date FROM daily_entries ORDER BY entry_date DESC');
-      let currentStreak = 0;
-      const todayDate = new Date();
-      for (let i = 0; i < entries.length; i++) {
-        const entryDate = new Date(Math.floor(entries[i].entry_date / 10000), Math.floor((entries[i].entry_date % 10000) / 100) - 1, entries[i].entry_date % 100);
-        const expectedDate = subDays(todayDate, i);
-        if (isSameDay(entryDate, expectedDate)) { currentStreak++; } else { break; }
-      }
-      setStreak(currentStreak);
-    }
-    calculateStreak();
-  }, [entry]);
+  const loadHomeData = useCallback(async () => {
+    const db = await getDatabase();
 
-  useEffect(() => {
-    async function fetchWeek() {
-      const db = await getDatabase();
-      const todayDate = new Date();
-      const weekStart = startOfWeek(todayDate, { weekStartsOn: 1 });
-      const days: { date: number; logged: boolean; severity: number }[] = [];
-      for (let i = 0; i < 7; i++) {
-        const d = addDays(weekStart, i);
-        const dateInt = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-        const entryRow = await db.getFirstAsync<{ id: number }>('SELECT id FROM daily_entries WHERE entry_date = ?', [dateInt]);
-        const maxSeverity = entryRow ? await db.getFirstAsync<{ max: number }>('SELECT MAX(severity) as max FROM symptom_logs WHERE daily_entry_id = ?', [entryRow.id]) : null;
-        days.push({ date: dateInt, logged: !!entryRow, severity: maxSeverity?.max || 0 });
+    // Streak
+    const entries = await db.getAllAsync<{ entry_date: number }>(
+      'SELECT entry_date FROM daily_entries ORDER BY entry_date DESC'
+    );
+    const todayDate = new Date();
+    let startOffset = 0;
+    if (entries.length === 0) {
+      setStreak(0);
+    } else {
+      const mostRecent = new Date(
+        Math.floor(entries[0].entry_date / 10000),
+        Math.floor((entries[0].entry_date % 10000) / 100) - 1,
+        entries[0].entry_date % 100
+      );
+      let proceed = true;
+      if (isSameDay(mostRecent, todayDate)) {
+        startOffset = 0;
+      } else if (isSameDay(mostRecent, subDays(todayDate, 1))) {
+        startOffset = 1;
+      } else {
+        setStreak(0);
+        proceed = false;
       }
-      setWeekData(days);
+      if (proceed) {
+        let currentStreak = 0;
+        for (let i = 0; i < entries.length; i++) {
+          const entryDate = new Date(
+            Math.floor(entries[i].entry_date / 10000),
+            Math.floor((entries[i].entry_date % 10000) / 100) - 1,
+            entries[i].entry_date % 100
+          );
+          const expectedDate = subDays(todayDate, i + startOffset);
+          if (isSameDay(entryDate, expectedDate)) currentStreak++;
+          else break;
+        }
+        setStreak(currentStreak);
+      }
     }
-    fetchWeek();
-  }, [entry]);
+
+    // Week — single grouped query, no N+1
+    const weekStart = startOfWeek(todayDate, { weekStartsOn: 1 });
+    const weekStartInt = weekStart.getFullYear() * 10000 + (weekStart.getMonth() + 1) * 100 + weekStart.getDate();
+    const weekEnd = addDays(weekStart, 6);
+    const weekEndInt = weekEnd.getFullYear() * 10000 + (weekEnd.getMonth() + 1) * 100 + weekEnd.getDate();
+    const rows = await db.getAllAsync<{ entry_date: number; max_severity: number | null }>(
+      `SELECT de.entry_date, MAX(sl.severity) as max_severity
+       FROM daily_entries de
+       LEFT JOIN symptom_logs sl ON sl.daily_entry_id = de.id
+       WHERE de.entry_date >= ? AND de.entry_date <= ?
+       GROUP BY de.entry_date`,
+      [weekStartInt, weekEndInt]
+    );
+    const byDate = new Map<number, number>();
+    for (const r of rows) byDate.set(r.entry_date, r.max_severity ?? 0);
+    const days: { date: number; logged: boolean; severity: number }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(weekStart, i);
+      const dateInt = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+      const logged = byDate.has(dateInt);
+      days.push({ date: dateInt, logged, severity: byDate.get(dateInt) ?? 0 });
+    }
+    setWeekData(days);
+  }, []);
+
+  useFocusEffect(useCallback(() => { loadHomeData(); }, [loadHomeData]));
 
   const greeting = getGreeting();
 

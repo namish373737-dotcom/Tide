@@ -17,17 +17,20 @@ const REMINDER_PRESETS = [
 ];
 
 export default function SettingsScreen() {
-  const [settings, setSettings] = useState<any>(null);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const { reminderTime, reminderEnabled, updateReminder, toggleReminder } = useNotifications();
 
   useEffect(() => {
     async function fetch() {
       const db = await getDatabase();
-      const row = await db.getFirstAsync('SELECT * FROM user_settings ORDER BY id DESC LIMIT 1');
-      setSettings(row);
-      const bio = await LocalAuthentication.hasHardwareAsync();
-      setBiometricAvailable(bio);
+      const row = await db.getFirstAsync<{ biometric_lock_enabled: number }>(
+        'SELECT biometric_lock_enabled FROM user_settings ORDER BY id DESC LIMIT 1'
+      );
+      setBiometricEnabled(!!row?.biometric_lock_enabled);
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      setBiometricAvailable(hasHardware && isEnrolled);
     }
     fetch();
   }, []);
@@ -67,9 +70,9 @@ export default function SettingsScreen() {
 
   const toggleBiometric = async () => {
     const db = await getDatabase();
-    const newVal = settings?.biometric_lock_enabled ? 0 : 1;
+    const newVal = biometricEnabled ? 0 : 1;
     await db.runAsync('UPDATE user_settings SET biometric_lock_enabled = ?', [newVal]);
-    setSettings({ ...settings, biometric_lock_enabled: newVal });
+    setBiometricEnabled(!!newVal);
   };
 
   return (
@@ -129,8 +132,8 @@ export default function SettingsScreen() {
           </View>
           <Text style={styles.sectionDescription}>Your data is stored only on this device. We do not collect, share, or sell your health information.</Text>
           {biometricAvailable && (
-            <SettingRow icon={<Fingerprint size={20} color={COLORS.primary} />} title="Biometric Lock" subtitle={settings?.biometric_lock_enabled ? 'Face ID / Touch ID is enabled' : 'Require Face ID or Touch ID to open the app'}
-              onPress={toggleBiometric} toggle value={!!settings?.biometric_lock_enabled} />
+            <SettingRow icon={<Fingerprint size={20} color={COLORS.primary} />} title="Biometric Lock" subtitle={biometricEnabled ? 'Face ID / Touch ID is enabled' : 'Require Face ID or Touch ID to open the app'}
+              onPress={toggleBiometric} toggle value={biometricEnabled} />
           )}
         </View>
 

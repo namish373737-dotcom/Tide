@@ -26,17 +26,24 @@ function RootLayout() {
           'SELECT biometric_lock_enabled FROM user_settings LIMIT 1'
         );
         if (settings?.biometric_lock_enabled) {
-          const result = await LocalAuthentication.authenticateAsync({
-            promptMessage: 'Unlock Solace',
-            fallbackLabel: 'Use Passcode',
-          });
-          if (!result.success) {
-            if (Platform.OS === 'android') {
+          let authenticated = false;
+          while (!authenticated) {
+            const result = await LocalAuthentication.authenticateAsync({
+              promptMessage: 'Unlock Solace',
+              fallbackLabel: 'Use Passcode',
+            });
+            if (result.success) {
+              authenticated = true;
+            } else if (Platform.OS === 'android') {
               BackHandler.exitApp();
+              return;
             } else {
-              Alert.alert('Unable to Unlock', 'Solace cannot be unlocked.');
+              await new Promise<void>(resolve =>
+                Alert.alert('Unlock Required', 'Please authenticate to access Solace.', [
+                  { text: 'Try Again', onPress: () => resolve() },
+                ])
+              );
             }
-            return;
           }
         }
       } catch (e) {

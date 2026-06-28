@@ -60,6 +60,7 @@ export default function CheckInScreen() {
 
   const handleSymptomChange = (id: number, value: number) => { hapticSelection(); setSymptomValues(prev => ({ ...prev, [id]: value })); };
   const handleTriggerToggle = (id: number) => { hapticSelection(); setTriggerValues(prev => ({ ...prev, [id]: prev[id] === 'true' ? 'false' : 'true' })); };
+  const handleTriggerScale = (id: number, value: number) => { hapticSelection(); setTriggerValues(prev => ({ ...prev, [id]: value.toString() })); };
 
   const handleSave = async () => {
     setSaving(true);
@@ -156,14 +157,31 @@ export default function CheckInScreen() {
         {/* Triggers */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Triggers</Text>
-          {triggers.map(trigger => (
-            <Pressable key={trigger.id} onPress={() => handleTriggerToggle(trigger.id)} style={[styles.triggerRow, triggerValues[trigger.id] === 'true' && styles.triggerRowActive]}>
-              <Text style={[styles.triggerName, triggerValues[trigger.id] === 'true' && styles.triggerNameActive]}>{trigger.displayName}</Text>
-              <View style={[styles.triggerCheck, triggerValues[trigger.id] === 'true' && styles.triggerCheckActive]}>
-                {triggerValues[trigger.id] === 'true' && <Text style={styles.triggerCheckMark}>✓</Text>}
-              </View>
-            </Pressable>
-          ))}
+          {triggers.map(trigger => {
+            if (trigger.inputType === 'scale') {
+              const current = parseInt(triggerValues[trigger.id] || '0', 10) || 0;
+              return (
+                <View key={trigger.id} style={styles.scaleTriggerRow}>
+                  <Text style={styles.scaleTriggerLabel}>{trigger.displayName}</Text>
+                  <View style={styles.ratingRow}>
+                    {[1, 2, 3, 4, 5].map(v => (
+                      <Pressable key={v} onPress={() => handleTriggerScale(trigger.id, v)} style={[styles.ratingButton, current === v && styles.ratingButtonActive]}>
+                        <Text style={[styles.ratingButtonText, current === v && styles.ratingButtonTextActive]}>{v}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              );
+            }
+            return (
+              <Pressable key={trigger.id} onPress={() => handleTriggerToggle(trigger.id)} style={[styles.triggerRow, triggerValues[trigger.id] === 'true' && styles.triggerRowActive]}>
+                <Text style={[styles.triggerName, triggerValues[trigger.id] === 'true' && styles.triggerNameActive]}>{trigger.displayName}</Text>
+                <View style={[styles.triggerCheck, triggerValues[trigger.id] === 'true' && styles.triggerCheckActive]}>
+                  {triggerValues[trigger.id] === 'true' && <Text style={styles.triggerCheckMark}>✓</Text>}
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
 
         {/* Medications */}
@@ -467,4 +485,6 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   pillText: { ...TYPOGRAPHY.label, color: COLORS.text },
   pillTextActive: { color: COLORS.white, fontWeight: '700' },
+  scaleTriggerRow: { marginBottom: SPACING.lg },
+  scaleTriggerLabel: { ...TYPOGRAPHY.body, color: COLORS.text, fontWeight: '500', marginBottom: SPACING.sm },
 });

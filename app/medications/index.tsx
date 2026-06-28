@@ -11,6 +11,9 @@ export default function MedicationsScreen() {
   const [newName, setNewName] = useState('');
   const [newDose, setNewDose] = useState('');
   const [newFrequency, setNewFrequency] = useState('daily');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDose, setEditDose] = useState('');
 
   useEffect(() => {
     async function fetch() {
@@ -30,6 +33,26 @@ export default function MedicationsScreen() {
     setNewName('');
     setNewDose('');
     setShowAdd(false);
+  };
+
+  const startEdit = (med: any) => {
+    setEditingId(med.id);
+    setEditName(med.name);
+    setEditDose(med.dosage || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName('');
+    setEditDose('');
+  };
+
+  const saveEdit = async () => {
+    if (editingId === null || !editName.trim()) return;
+    const db = await getDatabase();
+    await db.runAsync('UPDATE medications SET name = ?, dosage = ? WHERE id = ?', [editName.trim(), editDose.trim() || null, editingId]);
+    setMedications(prev => prev.map(m => m.id === editingId ? { ...m, name: editName.trim(), dosage: editDose.trim() || null } : m));
+    cancelEdit();
   };
 
   const deleteMedication = (id: number) => {
@@ -95,21 +118,39 @@ export default function MedicationsScreen() {
           </View>
         ) : (
           <View style={styles.medsList}>
-            {medications.map((med: any) => (
-              <View key={med.id} style={styles.medCard}>
-                <View style={styles.medLeft}>
-                  <Pill size={20} color={COLORS.primary} />
-                  <View style={styles.medInfo}>
-                    <Text style={styles.medName}>{med.name}</Text>
-                    {med.dosage && <Text style={styles.medDose}>{med.dosage}</Text>}
-                    <Text style={styles.medFreq}>{med.frequency?.replace('_', ' ')}</Text>
+            {medications.map((med: any) => {
+              if (editingId === med.id) {
+                return (
+                  <View key={med.id} style={styles.medCard}>
+                    <TextInput value={editName} onChangeText={setEditName} placeholder="Medication name" placeholderTextColor={COLORS.textTertiary} style={styles.input} />
+                    <TextInput value={editDose} onChangeText={setEditDose} placeholder="Dose" placeholderTextColor={COLORS.textTertiary} style={styles.input} />
+                    <View style={styles.editActions}>
+                      <Pressable onPress={cancelEdit} style={[styles.editButton, styles.editButtonCancel]}>
+                        <Text style={styles.editButtonCancelText}>Cancel</Text>
+                      </Pressable>
+                      <Pressable onPress={saveEdit} disabled={!editName.trim()} style={[styles.editButton, styles.editButtonSave, !editName.trim() && styles.addButtonDisabled]}>
+                        <Text style={styles.addButtonText}>Save</Text>
+                      </Pressable>
+                    </View>
                   </View>
-                </View>
-                <Pressable onPress={() => deleteMedication(med.id)} style={styles.deleteButton}>
-                  <Trash2 size={18} color={COLORS.danger} />
+                );
+              }
+              return (
+                <Pressable key={med.id} onPress={() => startEdit(med)} style={({ pressed }) => [styles.medCard, pressed && { opacity: 0.7 }]}>
+                  <View style={styles.medLeft}>
+                    <Pill size={20} color={COLORS.primary} />
+                    <View style={styles.medInfo}>
+                      <Text style={styles.medName}>{med.name}</Text>
+                      {med.dosage && <Text style={styles.medDose}>{med.dosage}</Text>}
+                      <Text style={styles.medFreq}>{med.frequency?.replace('_', ' ')}</Text>
+                    </View>
+                  </View>
+                  <Pressable onPress={() => deleteMedication(med.id)} style={styles.deleteButton} hitSlop={8}>
+                    <Trash2 size={18} color={COLORS.danger} />
+                  </Pressable>
                 </Pressable>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -148,4 +189,9 @@ const styles = StyleSheet.create({
   medDose: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, marginTop: 2 },
   medFreq: { ...TYPOGRAPHY.caption, color: COLORS.textTertiary, textTransform: 'capitalize', marginTop: 2 },
   deleteButton: { padding: SPACING.sm },
+  editActions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
+  editButton: { flex: 1, paddingVertical: SPACING.md, borderRadius: RADIUS.lg, alignItems: 'center' },
+  editButtonCancel: { backgroundColor: COLORS.surfaceElevated, borderWidth: 1, borderColor: COLORS.border },
+  editButtonCancelText: { ...TYPOGRAPHY.button, color: COLORS.text },
+  editButtonSave: { backgroundColor: COLORS.primary },
 });
