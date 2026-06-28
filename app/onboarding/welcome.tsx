@@ -1,4 +1,4 @@
-import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { Heart, Lock, Shield, Sparkles, ChevronRight } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
@@ -23,7 +23,7 @@ export default function WelcomeScreen() {
               <Heart size={44} color={COLORS.white} strokeWidth={2} fill={COLORS.white} />
             </View>
           </View>
-          <Text style={styles.tagline}>TIDE</Text>
+          <Text style={styles.tagline}>SOLACE</Text>
           <Text style={styles.title}>Your health journey,{'\n'}privately tracked</Text>
           <Text style={styles.subtitle}>
             Built for people living with endometriosis, PCOS, and chronic pain. 
@@ -60,9 +60,11 @@ export default function WelcomeScreen() {
           <Text style={styles.buttonText}>Get Started</Text>
           <ChevronRight size={20} color={COLORS.white} strokeWidth={2.5} />
         </Pressable>
-        <Text style={styles.footerText}>
-          By continuing, you agree to our Privacy Policy
-        </Text>
+        <Pressable onPress={() => Linking.openURL('https://solaceapp.co/privacy')}>
+          <Text style={styles.footerText}>
+            By continuing, you agree to our Privacy Policy
+          </Text>
+        </Pressable>
       </View>
     </View>
   );

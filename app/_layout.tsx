@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { getDatabase } from '@/lib/database/client';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, BackHandler, Platform, Alert } from 'react-native';
 import { COLORS } from '@/lib/theme';
 import * as Sentry from '@sentry/react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
@@ -20,7 +21,24 @@ function RootLayout() {
   useEffect(() => {
     async function init() {
       try {
-        await getDatabase();
+        const db = await getDatabase();
+        const settings = await db.getFirstAsync<{ biometric_lock_enabled: number }>(
+          'SELECT biometric_lock_enabled FROM user_settings LIMIT 1'
+        );
+        if (settings?.biometric_lock_enabled) {
+          const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: 'Unlock Solace',
+            fallbackLabel: 'Use Passcode',
+          });
+          if (!result.success) {
+            if (Platform.OS === 'android') {
+              BackHandler.exitApp();
+            } else {
+              Alert.alert('Unable to Unlock', 'Solace cannot be unlocked.');
+            }
+            return;
+          }
+        }
       } catch (e) {
         console.error('Database init failed:', e);
       }

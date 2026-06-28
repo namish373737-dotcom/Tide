@@ -11,7 +11,12 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.solace.app"
+      "bundleIdentifier": "com.solace.app",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Solace uses Face ID to protect your health data.",
+        "NSHealthShareUsageDescription": "Solace reads step count and heart rate to help enrich your symptom patterns.",
+        "NSHealthUpdateUsageDescription": "Solace does not write to Apple Health."
+      }
     },
     "android": {
       "adaptiveIcon": {

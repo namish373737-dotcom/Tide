@@ -247,6 +247,58 @@ export async function seedDatabase(): Promise<void> {
       ]
     );
 
+    await db!.runAsync(
+      `INSERT INTO symptoms (condition_id, name, display_name, category, sort_order) VALUES
+      (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?),
+      (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?),
+      (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?),
+      (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?),
+      (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?),
+      (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?),
+      (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)`,
+      [
+        // PMDD
+        conditionIds.pmdd, 'mood_swings', 'Mood Swings', 'mood', 1,
+        conditionIds.pmdd, 'irritability', 'Irritability', 'mood', 2,
+        conditionIds.pmdd, 'anxiety_pmdd', 'Anxiety', 'mood', 3,
+        conditionIds.pmdd, 'depression_pmdd', 'Depression', 'mood', 4,
+        conditionIds.pmdd, 'breast_tenderness', 'Breast Tenderness', 'pain', 5,
+        conditionIds.pmdd, 'bloating_pmdd', 'Bloating', 'digestive', 6,
+        conditionIds.pmdd, 'fatigue_pmdd', 'Fatigue', 'energy', 7,
+        conditionIds.pmdd, 'headache', 'Headache', 'pain', 8,
+        conditionIds.pmdd, 'food_cravings', 'Food Cravings', 'diet', 9,
+        conditionIds.pmdd, 'sleep_changes', 'Sleep Changes', 'sleep', 10,
+        conditionIds.pmdd, 'concentration', 'Concentration Issues', 'cognitive', 11,
+        conditionIds.pmdd, 'anger', 'Anger', 'mood', 12,
+        // Fibromyalgia
+        conditionIds.fibro, 'widespread_pain', 'Widespread Pain', 'pain', 1,
+        conditionIds.fibro, 'fatigue_fibro', 'Fatigue', 'energy', 2,
+        conditionIds.fibro, 'sleep_problems', 'Sleep Problems', 'sleep', 3,
+        conditionIds.fibro, 'brain_fog_fibro', 'Brain Fog', 'cognitive', 4,
+        conditionIds.fibro, 'morning_stiffness', 'Morning Stiffness', 'pain', 5,
+        conditionIds.fibro, 'headaches_fibro', 'Headaches', 'pain', 6,
+        conditionIds.fibro, 'numbness', 'Numbness', 'pain', 7,
+        conditionIds.fibro, 'sensitivity', 'Sensitivity', 'pain', 8,
+        conditionIds.fibro, 'ibs_fibro', 'IBS', 'digestive', 9,
+        conditionIds.fibro, 'anxiety_fibro', 'Anxiety', 'mood', 10,
+        conditionIds.fibro, 'depression_fibro', 'Depression', 'mood', 11,
+        conditionIds.fibro, 'jaw_pain', 'Jaw Pain', 'pain', 12,
+        // Chronic Pain
+        conditionIds.pain, 'daily_pain', 'Daily Pain', 'pain', 1,
+        conditionIds.pain, 'pain_intensity', 'Pain Intensity', 'pain', 2,
+        conditionIds.pain, 'mobility', 'Mobility', 'lifestyle', 3,
+        conditionIds.pain, 'sleep_pain', 'Sleep', 'sleep', 4,
+        conditionIds.pain, 'fatigue_pain', 'Fatigue', 'energy', 5,
+        conditionIds.pain, 'mood_pain', 'Mood', 'mood', 6,
+        // Other
+        conditionIds.other, 'fatigue_other', 'Fatigue', 'energy', 1,
+        conditionIds.other, 'pain_other', 'Pain', 'pain', 2,
+        conditionIds.other, 'mood_other', 'Mood', 'mood', 3,
+        conditionIds.other, 'sleep_other', 'Sleep', 'sleep', 4,
+        conditionIds.other, 'digestive_other', 'Digestive', 'digestive', 5,
+      ]
+    );
+
     // Seed triggers
     await db!.runAsync(
       `INSERT INTO triggers (name, display_name, category, input_type) VALUES

@@ -9,13 +9,31 @@ import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/them
 export default function HistoryScreen() {
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPro, setIsPro] = useState(false);
 
   useEffect(() => {
     async function fetch() {
       const db = await getDatabase();
-      const rows = await db.getAllAsync<any>(
-        `SELECT de.*, (SELECT MAX(severity) FROM symptom_logs WHERE daily_entry_id = de.id) as max_severity, (SELECT COUNT(*) FROM symptom_logs WHERE daily_entry_id = de.id) as symptom_count FROM daily_entries de ORDER BY de.entry_date DESC LIMIT 90`
+      const settings = await db.getFirstAsync<{ pro_subscription_status: string }>(
+        'SELECT pro_subscription_status FROM user_settings LIMIT 1'
       );
+      const pro = settings?.pro_subscription_status === 'active';
+      setIsPro(pro);
+
+      let rows: any[];
+      if (pro) {
+        rows = await db.getAllAsync<any>(
+          `SELECT de.*, (SELECT MAX(severity) FROM symptom_logs WHERE daily_entry_id = de.id) as max_severity, (SELECT COUNT(*) FROM symptom_logs WHERE daily_entry_id = de.id) as symptom_count FROM daily_entries de ORDER BY de.entry_date DESC LIMIT 365`
+        );
+      } else {
+        const since = new Date();
+        since.setDate(since.getDate() - 30);
+        const sinceInt = since.getFullYear() * 10000 + (since.getMonth() + 1) * 100 + since.getDate();
+        rows = await db.getAllAsync<any>(
+          `SELECT de.*, (SELECT MAX(severity) FROM symptom_logs WHERE daily_entry_id = de.id) as max_severity, (SELECT COUNT(*) FROM symptom_logs WHERE daily_entry_id = de.id) as symptom_count FROM daily_entries de WHERE de.entry_date >= ? ORDER BY de.entry_date DESC`,
+          [sinceInt]
+        );
+      }
       setEntries(rows); setLoading(false);
     }
     fetch();
@@ -26,6 +44,15 @@ export default function HistoryScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>History</Text>
+
+        {!isPro && (
+          <View style={styles.proBanner}>
+            <Text style={styles.proBannerText}>Viewing last 30 days — Upgrade to Pro for full history</Text>
+            <Pressable onPress={() => router.push('/paywall')} style={styles.proBannerButton}>
+              <Text style={styles.proBannerButtonText}>Upgrade</Text>
+            </Pressable>
+          </View>
+        )}
 
         {loading ? (
           <Text style={styles.loadingText}>Loading...</Text>
@@ -73,6 +100,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { paddingHorizontal: LAYOUT.screenPadding, paddingTop: LAYOUT.safeTop, paddingBottom: LAYOUT.safeBottom + SPACING.xl },
   title: { ...TYPOGRAPHY.h2, color: COLORS.text, marginBottom: SPACING.xl },
+  proBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.warningLight, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.xl, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.2)' },
+  proBannerText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, flex: 1, marginRight: SPACING.md, lineHeight: 20 },
+  proBannerButton: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm },
+  proBannerButtonText: { ...TYPOGRAPHY.label, color: COLORS.white },
   loadingText: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
   emptyCard: { backgroundColor: COLORS.surface, borderRadius: RADIUS.xl, padding: SPACING['2xl'], alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm },
   emptyTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, marginTop: SPACING.lg, marginBottom: SPACING.sm },

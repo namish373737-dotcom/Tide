@@ -18,10 +18,12 @@ export default function CheckInScreen() {
   const { entry, symptomLogs, triggerLogs, loading, saveEntry, saveSymptomLog, saveTriggerLog } = useDailyEntry(dateInt);
   const { symptoms } = useSymptoms();
   const { triggers } = useTriggers();
+  const { requestReview } = useInAppReview();
 
   const [notes, setNotes] = useState(entry?.notes || '');
   const [mood, setMood] = useState(entry?.mood || 3);
   const [energy, setEnergy] = useState(entry?.energy || 3);
+  const [sleepHours, setSleepHours] = useState<number | null>(entry?.sleepHours || null);
   const [symptomValues, setSymptomValues] = useState<Record<number, number>>({});
   const [triggerValues, setTriggerValues] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
@@ -52,7 +54,7 @@ export default function CheckInScreen() {
       const tMap: Record<number, string> = {};
       triggerLogs.forEach(l => { tMap[l.triggerId] = l.value; });
       setTriggerValues(tMap);
-      if (entry) { setNotes(entry.notes || ''); setMood(entry.mood || 3); setEnergy(entry.energy || 3); }
+      if (entry) { setNotes(entry.notes || ''); setMood(entry.mood || 3); setEnergy(entry.energy || 3); setSleepHours(entry.sleepHours || null); }
     }
   }, [loading, symptomLogs, triggerLogs, entry]);
 
@@ -62,17 +64,18 @@ export default function CheckInScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveEntry({ notes, mood, energy, steps: steps ?? undefined, restingHeartRate: restingHeartRate ?? undefined });
+      await saveEntry({ notes, mood, energy, sleepHours: sleepHours ?? undefined, steps: steps ?? undefined, restingHeartRate: restingHeartRate ?? undefined });
       for (const [sid, sev] of Object.entries(symptomValues)) { await saveSymptomLog(parseInt(sid), sev); }
       for (const [tid, val] of Object.entries(triggerValues)) { await saveTriggerLog(parseInt(tid), val); }
       hapticSuccess();
       await incrementCheckInCount();
+      await requestReview();
+      router.back();
     } catch (e) {
       console.error('Save failed:', e);
       Alert.alert('Save Failed', 'Something went wrong saving your check-in. Please try again.');
     } finally {
       setSaving(false);
-      router.back();
     }
   };
 
@@ -111,6 +114,16 @@ export default function CheckInScreen() {
               {[1, 2, 3, 4, 5].map(v => (
                 <Pressable key={v} onPress={() => { hapticSelection(); setEnergy(v); }} style={[styles.ratingButton, energy === v && styles.ratingButtonActive]}>
                   <Text style={[styles.ratingButtonText, energy === v && styles.ratingButtonTextActive]}>{v}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          <View style={styles.ratingSection}>
+            <Text style={styles.ratingLabel}>Sleep (hours)</Text>
+            <View style={styles.ratingRow}>
+              {[4, 5, 6, 7, 8, 9].map(v => (
+                <Pressable key={v} onPress={() => { hapticSelection(); setSleepHours(v); }} style={[styles.ratingButton, sleepHours === v && styles.ratingButtonActive]}>
+                  <Text style={[styles.ratingButtonText, sleepHours === v && styles.ratingButtonTextActive]}>{v}</Text>
                 </Pressable>
               ))}
             </View>

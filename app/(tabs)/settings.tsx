@@ -7,11 +7,19 @@ import { Shield, Trash2, Bell, Heart, ChevronRight, Fingerprint, Cloud, Lock, Pi
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 import { APP_NAME, APP_VERSION } from '@/lib/constants';
 import { exportBackup, importBackup } from '@/lib/backup';
+import { useNotifications } from '@/hooks/useNotifications';
+
+const REMINDER_PRESETS = [
+  { value: '20:00', label: '8:00 PM' },
+  { value: '21:00', label: '9:00 PM' },
+  { value: '22:00', label: '10:00 PM' },
+  { value: '23:00', label: '11:00 PM' },
+];
 
 export default function SettingsScreen() {
   const [settings, setSettings] = useState<any>(null);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [icloudAvailable, setIcloudAvailable] = useState(false);
+  const { reminderTime, reminderEnabled, updateReminder, toggleReminder } = useNotifications();
 
   useEffect(() => {
     async function fetch() {
@@ -20,7 +28,6 @@ export default function SettingsScreen() {
       setSettings(row);
       const bio = await LocalAuthentication.hasHardwareAsync();
       setBiometricAvailable(bio);
-      setIcloudAvailable(true);
     }
     fetch();
   }, []);
@@ -65,25 +72,6 @@ export default function SettingsScreen() {
     setSettings({ ...settings, biometric_lock_enabled: newVal });
   };
 
-  const toggleIcloud = async () => {
-    const db = await getDatabase();
-    const newVal = settings?.icloud_backup_enabled ? 0 : 1;
-    await db.runAsync('UPDATE user_settings SET icloud_backup_enabled = ?', [newVal]);
-    setSettings({ ...settings, icloud_backup_enabled: newVal });
-  };
-
-  const toggleReminder = async (enabled: boolean) => {
-    const db = await getDatabase();
-    await db.runAsync('UPDATE user_settings SET reminder_enabled = ?', [enabled ? 1 : 0]);
-    setSettings({ ...settings, reminder_enabled: enabled ? 1 : 0 });
-  };
-
-  const updateReminderTime = async (time: string) => {
-    const db = await getDatabase();
-    await db.runAsync('UPDATE user_settings SET daily_reminder_time = ?', [time]);
-    setSettings({ ...settings, daily_reminder_time: time });
-  };
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
@@ -99,11 +87,24 @@ export default function SettingsScreen() {
           <SettingRow
             icon={<Bell size={20} color={COLORS.primary} />}
             title="Daily Reminder"
-            subtitle={settings?.reminder_enabled ? `Reminds you at ${settings?.daily_reminder_time || '21:00'}` : 'Get a daily reminder to log your symptoms'}
-            onPress={() => toggleReminder(!settings?.reminder_enabled)}
+            subtitle={reminderEnabled ? `Reminds you at ${REMINDER_PRESETS.find(p => p.value === reminderTime)?.label || reminderTime}` : 'Get a daily reminder to log your symptoms'}
+            onPress={() => toggleReminder(!reminderEnabled)}
             toggle
-            value={!!settings?.reminder_enabled}
+            value={reminderEnabled}
           />
+          {reminderEnabled && (
+            <View style={styles.timePresetsRow}>
+              {REMINDER_PRESETS.map(preset => (
+                <Pressable
+                  key={preset.value}
+                  onPress={() => updateReminder(preset.value)}
+                  style={[styles.timePresetButton, reminderTime === preset.value && styles.timePresetButtonActive]}
+                >
+                  <Text style={[styles.timePresetText, reminderTime === preset.value && styles.timePresetTextActive]}>{preset.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Medications Section */}
@@ -130,10 +131,6 @@ export default function SettingsScreen() {
           {biometricAvailable && (
             <SettingRow icon={<Fingerprint size={20} color={COLORS.primary} />} title="Biometric Lock" subtitle={settings?.biometric_lock_enabled ? 'Face ID / Touch ID is enabled' : 'Require Face ID or Touch ID to open the app'}
               onPress={toggleBiometric} toggle value={!!settings?.biometric_lock_enabled} />
-          )}
-          {icloudAvailable && (
-            <SettingRow icon={<Cloud size={20} color={COLORS.primary} />} title="iCloud Backup" subtitle={settings?.icloud_backup_enabled ? 'Encrypted backup to iCloud is enabled' : 'Backup your data to your private iCloud container'}
-              onPress={toggleIcloud} toggle value={!!settings?.icloud_backup_enabled} />
           )}
         </View>
 
@@ -238,6 +235,11 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm },
   sectionTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, marginLeft: SPACING.sm },
   sectionDescription: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, lineHeight: 22, marginBottom: SPACING.md },
+  timePresetsRow: { flexDirection: 'row', gap: SPACING.sm, paddingTop: SPACING.sm, paddingBottom: SPACING.sm },
+  timePresetButton: { flex: 1, paddingVertical: SPACING.sm + 2, borderRadius: RADIUS.lg, backgroundColor: COLORS.surfaceElevated, borderWidth: 1.5, borderColor: COLORS.border, alignItems: 'center' },
+  timePresetButtonActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  timePresetText: { ...TYPOGRAPHY.label, color: COLORS.text },
+  timePresetTextActive: { color: COLORS.white },
   settingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.divider },
   settingRowPressed: { opacity: 0.7 },
   settingIcon: { marginRight: SPACING.sm },

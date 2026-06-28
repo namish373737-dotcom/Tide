@@ -19,10 +19,18 @@ export default function ConditionsScreen() {
   const handleContinue = async () => {
     if (selected.length === 0) return;
     const db = await getDatabase();
-    await db.runAsync(
-      'INSERT INTO user_settings (selected_conditions) VALUES (?)',
-      [JSON.stringify(selected)]
-    );
+    const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM user_settings LIMIT 1');
+    if (existing) {
+      await db.runAsync(
+        'UPDATE user_settings SET selected_conditions = ? WHERE id = ?',
+        [JSON.stringify(selected), existing.id]
+      );
+    } else {
+      await db.runAsync(
+        'INSERT INTO user_settings (selected_conditions) VALUES (?)',
+        [JSON.stringify(selected)]
+      );
+    }
     router.push('/onboarding/symptoms');
   };
 

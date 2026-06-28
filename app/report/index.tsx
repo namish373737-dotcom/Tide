@@ -11,8 +11,23 @@ import { APP_NAME, APP_TAGLINE, APP_VERSION } from '@/lib/constants';
 
 export default function ReportScreen() {
   const [entries, setEntries] = useState<any[]>([]);
+  const [medications, setMedications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [days, setDays] = useState(30);
+  const [days, setDays] = useState(7);
+  const [isPro, setIsPro] = useState(false);
+
+  useEffect(() => {
+    async function checkPro() {
+      const db = await getDatabase();
+      const settings = await db.getFirstAsync<{ pro_subscription_status: string }>(
+        'SELECT pro_subscription_status FROM user_settings LIMIT 1'
+      );
+      const pro = settings?.pro_subscription_status === 'active';
+      setIsPro(pro);
+      if (!pro) setDays(7);
+    }
+    checkPro();
+  }, []);
 
   useEffect(() => {
     async function fetch() {
@@ -20,24 +35,46 @@ export default function ReportScreen() {
       const since = new Date();
       since.setDate(since.getDate() - days);
       const sinceInt = since.getFullYear() * 10000 + (since.getMonth() + 1) * 100 + since.getDate();
-      const rows = await db.getAllAsync(
-        `SELECT de.*, 
-          (SELECT json_group_array(json_object('name', s.display_name, 'severity', sl.severity)) 
-           FROM symptom_logs sl JOIN symptoms s ON s.id = sl.symptom_id 
-           WHERE sl.daily_entry_id = de.id) as symptoms_json
+      const rows = await db.getAllAsync<any>(
+        `SELECT de.*,
+          (SELECT json_group_array(json_object('name', s.display_name, 'severity', sl.severity))
+           FROM symptom_logs sl JOIN symptoms s ON s.id = sl.symptom_id
+           WHERE sl.daily_entry_id = de.id) as symptoms_json,
+          (SELECT json_group_array(t.display_name)
+           FROM trigger_logs tl JOIN triggers t ON t.id = tl.trigger_id
+           WHERE tl.daily_entry_id = de.id AND tl.value = 'true') as triggers_json,
+          (SELECT json_group_array(m.name)
+           FROM medication_logs ml JOIN medications m ON m.id = ml.medication_id
+           WHERE ml.daily_entry_id = de.id AND ml.taken = 1) as medications_json,
+          (SELECT flow_level FROM cycle_logs WHERE daily_entry_id = de.id) as cycle_flow_level,
+          (SELECT phase FROM cycle_logs WHERE daily_entry_id = de.id) as cycle_phase
          FROM daily_entries de
          WHERE de.entry_date >= ?
          ORDER BY de.entry_date DESC`,
         [sinceInt]
       );
       setEntries(rows);
+
+      const medRows = await db.getAllAsync<any>(
+        `SELECT m.id, m.name,
+           COUNT(ml.id) as logged_days,
+           SUM(CASE WHEN ml.taken = 1 THEN 1 ELSE 0 END) as taken_days
+         FROM medications m
+         LEFT JOIN medication_logs ml ON ml.medication_id = m.id
+           AND ml.daily_entry_id IN (SELECT id FROM daily_entries WHERE entry_date >= ?)
+         WHERE m.is_active = 1
+         GROUP BY m.id`,
+        [sinceInt]
+      );
+      setMedications(medRows);
+
       setLoading(false);
     }
     fetch();
   }, [days]);
 
   const generatePDF = async () => {
-    const html = buildHTML(entries, days);
+    const html = buildHTML(entries, medications, days);
     const { uri } = await Print.printToFileAsync({ html });
     await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
   };
@@ -56,10 +93,19 @@ export default function ReportScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.description}>Generate a PDF report for your next doctor appointment.</Text>
 
+        {!isPro && (
+          <View style={styles.proBanner}>
+            <Text style={styles.proBannerText}>Upgrade to Pro for 30/60/90-day reports</Text>
+            <Pressable onPress={() => router.push('/paywall')} style={styles.proBannerButton}>
+              <Text style={styles.proBannerButtonText}>Upgrade</Text>
+            </Pressable>
+          </View>
+        )}
+
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Report Period</Text>
           <View style={styles.daysRow}>
-            {[7, 30, 60, 90].map(d => (
+            {(isPro ? [7, 30, 60, 90] : [7]).map(d => (
               <Pressable key={d} onPress={() => setDays(d)} style={[styles.dayButton, days === d && styles.dayButtonActive]}>
                 <Text style={[styles.dayButtonText, days === d && styles.dayButtonTextActive]}>{d} days</Text>
               </Pressable>
@@ -84,21 +130,46 @@ export default function ReportScreen() {
   );
 }
 
-function buildHTML(entries: any[], days: number): string {
+function buildHTML(entries: any[], medications: any[], days: number): string {
   const since = subDays(new Date(), days);
   const sinceStr = format(since, 'MMM d, yyyy');
   const todayStr = format(new Date(), 'MMM d, yyyy');
   const todayDate = format(new Date(), 'MMMM d, yyyy');
 
+  const totalLogged = medications.reduce((sum, m) => sum + (m.logged_days || 0), 0);
+  const totalTaken = medications.reduce((sum, m) => sum + (m.taken_days || 0), 0);
+  const overallAdherence = totalLogged > 0 ? Math.round((totalTaken / totalLogged) * 100) : null;
+
+  const medicationsSection = medications.length === 0 ? '' : `
+    <div class="med-summary">
+      <h2>Medications</h2>
+      <p><strong>Overall Adherence:</strong> ${overallAdherence !== null ? overallAdherence + '%' : 'No data'}</p>
+      <ul>
+        ${medications.map((m: any) => {
+          const pct = m.logged_days > 0 ? Math.round((m.taken_days / m.logged_days) * 100) : null;
+          return `<li>${m.name}: ${pct !== null ? pct + '% adherence' : 'No data'}</li>`;
+        }).join('')}
+      </ul>
+    </div>`;
+
   const rows = entries.map((e: any) => {
     const dateObj = new Date(Math.floor(e.entry_date / 10000), Math.floor((e.entry_date % 10000) / 100) - 1, e.entry_date % 100);
     const symptoms = JSON.parse(e.symptoms_json || '[]');
+    const triggers = JSON.parse(e.triggers_json || '[]');
+    const medsTaken = JSON.parse(e.medications_json || '[]');
     const symptomText = symptoms.map((s: any) => `${s.name}: ${s.severity}/10`).join(', ') || 'None';
+    const triggerText = triggers.join(', ') || 'None';
+    const cycleParts = [e.cycle_flow_level, e.cycle_phase].filter(Boolean);
+    const cycleText = cycleParts.length > 0 ? cycleParts.join(' / ') : '-';
+    const medsText = medsTaken.join(', ') || '-';
     return `<tr>
       <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${format(dateObj, 'MMM d')}</td>
       <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${symptomText}</td>
-      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${e.mood || '-'}</td>
-      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${e.energy || '-'}</td>
+      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${triggerText}</td>
+      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${medsText}</td>
+      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${cycleText}</td>
+      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${e.mood ? e.mood + '/5' : '-'}</td>
+      <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${e.energy ? e.energy + '/5' : '-'}</td>
       <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px;">${e.notes || '-'}</td>
     </tr>`;
   }).join('');
@@ -108,8 +179,11 @@ function buildHTML(entries: any[], days: number): string {
       <style>
         body { font-family: -apple-system, sans-serif; padding: 40px; color: #1a1a2e; }
         h1 { color: #0d7377; font-size: 28px; margin-bottom: 8px; }
+        h2 { color: #0d7377; font-size: 18px; margin-bottom: 8px; }
         .subtitle { color: #5a5a7a; font-size: 14px; margin-bottom: 30px; }
         .date-range { font-size: 16px; margin-bottom: 20px; }
+        .med-summary { margin-bottom: 20px; padding: 16px; background: #f7f7fb; border-radius: 8px; }
+        .med-summary ul { margin: 8px 0 0; padding-left: 20px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th { background: #0d7377; color: white; padding: 12px; text-align: left; font-size: 14px; }
         .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #5a5a7a; }
@@ -120,8 +194,9 @@ function buildHTML(entries: any[], days: number): string {
       <p class="subtitle">Generated by ${APP_NAME} — ${APP_TAGLINE}</p>
       <p class="date-range"><strong>Date Range:</strong> ${sinceStr} — ${todayStr}</p>
       <p><strong>Total Entries:</strong> ${entries.length}</p>
+      ${medicationsSection}
       <table>
-        <tr><th>Date</th><th>Symptoms</th><th>Mood</th><th>Energy</th><th>Notes</th></tr>
+        <tr><th>Date</th><th>Symptoms</th><th>Triggers</th><th>Medications</th><th>Cycle</th><th>Mood</th><th>Energy</th><th>Notes</th></tr>
         ${rows}
       </table>
       <div class="footer">
@@ -139,6 +214,10 @@ const styles = StyleSheet.create({
   headerTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, flex: 1, textAlign: 'center' },
   scrollContent: { paddingHorizontal: LAYOUT.screenPadding, paddingBottom: LAYOUT.safeBottom + SPACING.xl },
   description: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, marginBottom: SPACING.xl, lineHeight: 24 },
+  proBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.warningLight, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.xl, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.2)' },
+  proBannerText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textSecondary, flex: 1, marginRight: SPACING.md, lineHeight: 20 },
+  proBannerButton: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm },
+  proBannerButtonText: { ...TYPOGRAPHY.label, color: COLORS.white },
   card: { backgroundColor: COLORS.surface, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.xl, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm },
   cardLabel: { ...TYPOGRAPHY.label, color: COLORS.textSecondary, marginBottom: SPACING.md },
   daysRow: { flexDirection: 'row', justifyContent: 'space-between', gap: SPACING.sm },
