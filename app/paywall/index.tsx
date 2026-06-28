@@ -109,6 +109,10 @@ export default function PaywallScreen() {
           <Text style={styles.restoreButtonText}>Restore Purchase</Text>
         </Pressable>
 
+        <Text style={styles.legalText}>
+          Solace Pro is an auto-renewable subscription. $4.99/month or $29.99/year. Payment will be charged to your Apple Account at confirmation of purchase. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Cancel anytime in your Apple ID settings.
+        </Text>
+
         <Text style={styles.disclaimer}>Cancel anytime. No medical claims are made — {APP_NAME} is a self-tracking wellness tool, not a diagnostic device.</Text>
       </ScrollView>
     </View>
@@ -145,4 +149,5 @@ const styles = StyleSheet.create({
   restoreButton: { alignItems: 'center', paddingVertical: SPACING.sm, marginBottom: SPACING.lg },
   restoreButtonText: { ...TYPOGRAPHY.bodySmall, color: COLORS.primary },
   disclaimer: { ...TYPOGRAPHY.caption, color: COLORS.textTertiary, textAlign: 'center', lineHeight: 18 },
+  legalText: { ...TYPOGRAPHY.caption, color: COLORS.textTertiary, textAlign: 'center', lineHeight: 18, marginBottom: SPACING.md },
 });

@@ -27,7 +27,7 @@ export function useInAppReview() {
     const checkInCount = settings?.check_in_count || 0;
 
     // Only prompt after 3 check-ins and not more than once every 30 days
-    if (checkInCount >= 3 && now - lastPrompt > 30 * 24 * 60 * 60 * 1000) {
+    if (checkInCount >= 7 && now - lastPrompt > 30 * 24 * 60 * 60 * 1000) {
       await db.runAsync('UPDATE user_settings SET last_review_prompt = ?', [now]);
       await StoreReview.requestReview();
     }

@@ -23,7 +23,7 @@ export default function HistoryScreen() {
       let rows: any[];
       if (pro) {
         rows = await db.getAllAsync<any>(
-          `SELECT de.*, (SELECT MAX(severity) FROM symptom_logs WHERE daily_entry_id = de.id) as max_severity, (SELECT COUNT(*) FROM symptom_logs WHERE daily_entry_id = de.id) as symptom_count FROM daily_entries de ORDER BY de.entry_date DESC LIMIT 365`
+          `SELECT de.*, (SELECT MAX(severity) FROM symptom_logs WHERE daily_entry_id = de.id) as max_severity, (SELECT COUNT(*) FROM symptom_logs WHERE daily_entry_id = de.id) as symptom_count FROM daily_entries de ORDER BY de.entry_date DESC LIMIT 1000`
         );
       } else {
         const since = new Date();

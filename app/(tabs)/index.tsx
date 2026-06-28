@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, StatusBar } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSymptoms } from '@/hooks/useEntities';
-import { useDailyEntry } from '@/hooks/useDailyEntry';
 import { getDatabase } from '@/lib/database/client';
 import { format, subDays, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { Flame, TrendingUp, ChevronRight, Plus, FileText } from 'lucide-react-native';
@@ -22,10 +21,11 @@ function getGreeting(): string {
 
 export default function DashboardScreen() {
   const today = getTodayDateInt();
-  const { entry, symptomLogs, loading } = useDailyEntry(today);
   const { symptoms } = useSymptoms();
   const [streak, setStreak] = useState(0);
   const [weekData, setWeekData] = useState<{ date: number; logged: boolean; severity: number }[]>([]);
+  const [todayEntry, setTodayEntry] = useState<any>(null);
+  const [todayLogs, setTodayLogs] = useState<any[]>([]);
 
   const loadHomeData = useCallback(async () => {
     const db = await getDatabase();
@@ -92,6 +92,24 @@ export default function DashboardScreen() {
       days.push({ date: dateInt, logged, severity: byDate.get(dateInt) ?? 0 });
     }
     setWeekData(days);
+
+    // Today's entry + symptom logs
+    const todayInt = getTodayDateInt();
+    const tEntry = await db.getFirstAsync<{ id: number }>(
+      'SELECT id FROM daily_entries WHERE entry_date = ?',
+      [todayInt]
+    );
+    if (tEntry) {
+      setTodayEntry(tEntry);
+      const tLogs = await db.getAllAsync<{ severity: number; symptom_id: number }>(
+        'SELECT sl.severity, sl.symptom_id FROM symptom_logs sl WHERE sl.daily_entry_id = ?',
+        [tEntry.id]
+      );
+      setTodayLogs(tLogs.map(l => ({ severity: l.severity, symptomId: l.symptom_id })));
+    } else {
+      setTodayEntry(null);
+      setTodayLogs([]);
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { loadHomeData(); }, [loadHomeData]));
@@ -147,23 +165,23 @@ export default function DashboardScreen() {
         </View>
 
         {/* Today's Check-in */}
-        <View style={[styles.sectionCard, entry ? styles.loggedCard : styles.uncheckedCard]}>
+        <View style={[styles.sectionCard, todayEntry ? styles.loggedCard : styles.uncheckedCard]}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>Today's Check-in</Text>
-            {entry && (
+            {todayEntry && (
               <View style={styles.loggedBadge}>
                 <Text style={styles.loggedBadgeText}>Logged</Text>
               </View>
             )}
           </View>
-          
-          {entry && symptomLogs.length > 0 ? (
+
+          {todayEntry && todayLogs.length > 0 ? (
             <View style={styles.symptomList}>
-              {symptomLogs.slice(0, 3).map(log => {
+              {todayLogs.slice(0, 3).map((log, idx) => {
                 const symptom = symptoms.find(s => s.id === log.symptomId);
                 if (!symptom) return null;
                 return (
-                  <View key={log.id} style={styles.symptomRow}>
+                  <View key={idx} style={styles.symptomRow}>
                     <Text style={styles.symptomName}>{symptom.displayName}</Text>
                     <View style={styles.symptomValue}>
                       <View style={[styles.severityDot, log.severity >= 7 ? styles.severityHigh : log.severity >= 4 ? styles.severityMed : styles.severityLow]} />
@@ -175,13 +193,13 @@ export default function DashboardScreen() {
             </View>
           ) : (
             <Text style={styles.emptyText}>
-              {entry ? 'No symptoms logged yet.' : 'Take a moment to check in — it helps you and your doctor.'}
+              {todayEntry ? 'No symptoms logged yet.' : 'Take a moment to check in — it helps you and your doctor.'}
             </Text>
           )}
-          
+
           <Pressable onPress={() => router.push('/check-in/' + today)} style={({ pressed }) => [styles.checkInButton, pressed && styles.checkInButtonPressed]}>
             <Plus size={18} color={COLORS.white} />
-            <Text style={styles.checkInButtonText}>{entry ? 'Update Check-in' : 'Start Check-in'}</Text>
+            <Text style={styles.checkInButtonText}>{todayEntry ? 'Update Check-in' : 'Start Check-in'}</Text>
           </Pressable>
         </View>
 

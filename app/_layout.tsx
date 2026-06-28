@@ -73,6 +73,8 @@ function RootLayout() {
         <Stack.Screen name="check-in" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="paywall" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="report" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="manage-symptoms" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="manage-triggers" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );

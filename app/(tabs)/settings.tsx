@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { getDatabase } from '@/lib/database/client';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { Shield, Trash2, Bell, Heart, ChevronRight, Fingerprint, Cloud, Lock, Pill, Download, Upload } from 'lucide-react-native';
+import { Shield, Trash2, Bell, Heart, ChevronRight, Fingerprint, Cloud, Lock, Pill, Download, Upload, Activity, Zap } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS, LAYOUT } from '@/lib/theme';
 import { APP_NAME, APP_VERSION } from '@/lib/constants';
 import { exportBackup, importBackup } from '@/lib/backup';
@@ -121,6 +121,26 @@ export default function SettingsScreen() {
             title="Manage Medications"
             subtitle="Add or remove medications and supplements"
             onPress={() => router.push('/medications')}
+          />
+        </View>
+
+        {/* Tracking Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Activity size={20} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>Tracking</Text>
+          </View>
+          <SettingRow
+            icon={<Activity size={20} color={COLORS.primary} />}
+            title="Manage Symptoms"
+            subtitle="Enable, disable, or add custom symptoms"
+            onPress={() => router.push('/manage-symptoms')}
+          />
+          <SettingRow
+            icon={<Zap size={20} color={COLORS.primary} />}
+            title="Manage Triggers"
+            subtitle="Enable, disable, or add custom triggers"
+            onPress={() => router.push('/manage-triggers')}
           />
         </View>
 

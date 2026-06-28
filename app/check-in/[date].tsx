@@ -60,7 +60,13 @@ export default function CheckInScreen() {
 
   const handleSymptomChange = (id: number, value: number) => { hapticSelection(); setSymptomValues(prev => ({ ...prev, [id]: value })); };
   const handleTriggerToggle = (id: number) => { hapticSelection(); setTriggerValues(prev => ({ ...prev, [id]: prev[id] === 'true' ? 'false' : 'true' })); };
-  const handleTriggerScale = (id: number, value: number) => { hapticSelection(); setTriggerValues(prev => ({ ...prev, [id]: value.toString() })); };
+  const handleTriggerScale = (id: number, value: number) => {
+    hapticSelection();
+    setTriggerValues(prev => {
+      const current = parseInt(prev[id] || '0', 10);
+      return { ...prev, [id]: current === value ? '0' : value.toString() };
+    });
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -134,6 +140,11 @@ export default function CheckInScreen() {
         {/* Symptoms */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Symptoms</Text>
+          {symptoms.length === 0 && (
+            <Text style={styles.emptyText}>
+              No symptoms configured. Go to Settings → Reset Onboarding to add symptoms for your condition.
+            </Text>
+          )}
           {symptoms.map(symptom => (
             <View key={symptom.id} style={styles.symptomRow}>
               <View style={styles.symptomHeader}>
